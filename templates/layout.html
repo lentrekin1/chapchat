@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>{% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.3/css/bootstrap.min.css"
+        integrity="sha384-Zug+QiDoJOrZ5t4lssLdxGhVrurbmBWopoEl+M6BdEfwnCJZtKxi1KgxUyJq13dy" crossorigin="anonymous">
+    <style>
+        body {
+            background-color: gray;
+            padding: 0;
+        }
+
+        .container {
+            background-color: white;
+            padding-top: 20px;
+            padding-bottom: 20px;
+        }
+
+        pre {
+            background-color: ghostwhite;
+            border: 1px solid silver;
+            padding: 10px 20px;
+            margin: 20px;
+        }
+
+        .solid-line-right {
+            border-right: 2px solid #333;
+        }
+
+        .solid-line-top {
+            border-top: 2px solid #333;
+        }
+
+        .row-height-fixed {
+            height: 400px;
+        }
+    </style>
+</head>
+
+<body>
+    {% block body %}
+    {% endblock %}
+</body>
+
+</html>
