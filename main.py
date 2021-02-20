@@ -9,8 +9,9 @@ from flask import Flask, render_template
 from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+app.config["SECRET_KEY"] = 'qwed!R2eas@R#$4a'
 socketio = SocketIO(app)
+socketio.init_app(app, cors_allowed_origins="*")
 
 # Establish global variables for tracking users
 users = []                                          # list of users
@@ -74,7 +75,7 @@ def log_in(data):
     else:
         app.logger.info(f"Username '{username}' taken.")
         emit("username taken", broadcast=False)
-
+#maybe prob is emit() isnt sending to right address?
 
 @socketio.on("new channel created")
 def create_new_channel(data):
@@ -188,11 +189,16 @@ def valid_channel(channel: str) -> bool:
 hostname='chap-chats'
 
 def expose():
-    c = subprocess.Popen(['C:\\Users\\lance\\PycharmProjects\\chapchat\\staqlab-tunnel.exe', '5000', 'hostname=' + hostname])
+    c = subprocess.Popen(['C:\\Users\\lance\\PycharmProjects\\chapchat\\staqlab-tunnel.exe', '8080', 'hostname=' + hostname])
     print(c.communicate())
 
+reveal = False
+debug = True
+
 if __name__ == "__main__":
-    t = threading.Thread(target=expose, args=())
-    t.start()
-    time.sleep(3)
-    socketio.run(app, debug=True)
+    if reveal:
+        t = threading.Thread(target=expose, args=())
+        t.start()
+        time.sleep(20)
+    socketio.run(app, debug=debug)#, port=8080)
+    #todo y tf dont files refresh when i restart local server (ie index.js)

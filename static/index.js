@@ -9,9 +9,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const form = document.querySelector('#chatroom');
   form.style.display = 'none';
 
+    var arr = window.location.href.split('/')
+    //test
   // Connect to websocket
   const socket = io.connect(
-    `${window.location.protocol}//${document.domain}:${window.location.port}`
+    //window.location.href
+    arr[0] + '//' + arr[2]
+    //`${window.location.protocol}${document.domain}:${window.location.port}`
   );
 
   // By default, ensure the login submit button is disabled
