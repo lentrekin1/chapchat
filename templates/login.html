@@ -26,6 +26,7 @@
   <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
   <style type="text/css">
   </style>
+  <link rel="stylesheet" href="{{ url_for('static',filename='styles/stylesheet.css') }}" type="text/css">
 </head>
 
 <body>
@@ -40,13 +41,18 @@
             <form role="form" id="frm-login">
               <fieldset>
                 <div class="form-group">
-                  <input class="form-control" placeholder="Enter Nickname" name="nickname" id="nickname" type="text" autofocus required="">
+                  <input class="form-control" placeholder="Enter Nickname" name="nickname" id="nickname" type="text">
                 </div>
-                <button type="submit" class="btn btn-lg btn-success btn-block">Enter Chat</button>
+                <button type="submit" class="btn btn-lg btn-success btn-block">Enter Main Chat</button>
+                <div class="form-group">
+                  <input class="form-control" placeholder="Enter Room Code to Join Specific Room" name="room" id="room" type="text" style="margin-top:10px;">
+                </div>
+                <button type="submit" class="btn btn-lg btn-primary btn-block">Join Specific Room</button>
               </fieldset>
             </form>
           </div>
         </div>
+        <a href="newroom"><button type="button" class="btn btn-lg btn-primary btn-block" id="newroom" style="margin-top:10px;">Create New Room</button></a>
       </div>
     </div>
   </div>
