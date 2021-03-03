@@ -8,51 +8,67 @@
   <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
   <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.min.js"></script>
   <script>
-    $(function () {
-      if ($.cookie("realtime-chat-nickname")) {
-        window.location = "/"
-      } else {
-        $("#frm-login").submit(function (event) {
-          event.preventDefault();
-          if ($("#nickname").val() !== '') {
+    //$(function () {
+      //if ($.cookie("realtime-chat-nickname")) {
+      //  window.location = "/mainchat"
+      //} else {
+        //$("#frm-login").submit(function (event) {
+          //event.preventDefault();
+          //console.log('qwerwfgd');
+          //if ($("#nickname").val() !== '') {
+            //$.cookie("realtime-chat-nickname", $("#nickname").val());
+            //window.location = "/redir";
+          //}
+        //})
+    //})
+    function check() {
+        //event.preventDefault();
+        //alert('ert')
+        if ($("#nickname").val() !== '') {
+            //alert('qwerwfgd');
+            //console.log('werty')
             $.cookie("realtime-chat-nickname", $("#nickname").val());
-            window.location = "/";
-          }
-        })
-      }
-    })
+            window.location = "/redir";
+        }
+        return false;
+    }
+    function setName() {
+      $.cookie("realtime-chat-nickname", $("#nickname").val());
+    }
   </script>
   <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
   <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
   <style type="text/css">
   </style>
   <link rel="stylesheet" href="{{ url_for('static',filename='styles/stylesheet.css') }}" type="text/css">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 </head>
 
 <body>
   <div class="container" style="padding-top: 50px">
     <div class="row">
-      <div class="col-md-4 col-md-offset-4">
+      <div class="col-md-auto">
         <div class="login-panel panel panel-default">
           <div class="panel-heading">
             <h3 class="panel-title">Choose a nickname to enter chat</h3>
           </div>
           <div class="panel-body">
-            <form role="form" id="frm-login">
+            <form role="form" name="frm-login" method="post">
               <fieldset>
                 <div class="form-group">
                   <input class="form-control" placeholder="Enter Nickname" name="nickname" id="nickname" type="text">
                 </div>
-                <button type="submit" class="btn btn-lg btn-success btn-block">Enter Main Chat</button>
+                <button type="submit" class="btn btn-lg btn-success" name="main" onclick="setName()">Enter Main Chat</button>
                 <div class="form-group">
                   <input class="form-control" placeholder="Enter Room Code to Join Specific Room" name="room" id="room" type="text" style="margin-top:10px;">
                 </div>
-                <button type="submit" class="btn btn-lg btn-primary btn-block">Join Specific Room</button>
+                <button type="submit" class="btn btn-lg btn-primary" name="specific" onclick="setName()">Join Specific Room</button>
+                <br>
+                <button type="submit" class="btn btn-lg btn-primary" name="newroom" style="margin-top:10px;">Create New Room</button>
               </fieldset>
             </form>
           </div>
         </div>
-        <a href="newroom"><button type="button" class="btn btn-lg btn-primary btn-block" id="newroom" style="margin-top:10px;">Create New Room</button></a>
       </div>
     </div>
   </div>

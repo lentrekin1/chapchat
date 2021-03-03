@@ -37,9 +37,18 @@ def chat():
   else:
     return redirect('/login')
 
-@app.route('/mainchat')
+'''@app.route('/redir')
+def redir():
+  print(request.form)
+  print(request.form.get("room"))
+  if request.form.get('specific'):
+    print('wert')
+  return 'e'
+  '''
+
+'''@app.route('/mainchat')
 def mainchat():
-  return render_template('chat.html')
+  return render_template('chat.html')'''
 
 @app.errorhandler(404)
 def err_404(e):
@@ -52,24 +61,46 @@ def newroom():
     name = request.form.get('roomname')
     if name and val_room(name):
         rooms.append(name)
-        return redirect('/privroom/' + str(name))
+        return redirect('/'+str(name))
     #print(request.form.get('roomname'))
 
   return render_template('newroom.html')
 
-@app.route('/login')
+@app.route('/login', methods=['GET', 'POST'])
 def login():
+  if request.method == 'POST':
+    print(request.form)
+    if 'main' in request.form.keys() and request.form.get('nickname'):
+      return redirect('/mainchat')
+    elif 'specific' in request.form.keys() and request.form.get('room') and request.form.get('nickname'):
+      return redirect('/' + request.form.get('room'))
+    elif 'newroom' in request.form.keys():
+      return redirect('/newroom')
+    else:
+      return render_template('login.html')
+    #print(list(request.form.keys()))
   #todo add test to see if login info valid - prob on both client and server
   return render_template('login.html')
 
-#todo prob return edited chat.html to be privroom - maybe better method?
-@app.route('/privroom/<privroomname>')
-def priv_room(privroomname):
-  return privroomname
+#todo add x has LEFT the server message
+#todo sending messages to main chat works- do priv chats
+#todo add check so user cant impersonate server - prob make server msgs red or smthn
+@app.route('/<name>')
+def priv_room(name):
+  print(request.cookies)
+  if name in rooms or name == 'mainchat':
+    if 'realtime-chat-nickname' in request.cookies:
+      print(f'{request.cookies["realtime-chat-nickname"]} has joined the server')
+      socketio.emit('announcement', {'data': f'{request.cookies["realtime-chat-nickname"]} has joined the server'}, broadcast=True, namespace='/mainchat')
+      return render_template('chat.html')
+    else:
+      return redirect('/login')
+  return render_template('404.html'), 404
 
 @socketio.on('message', namespace='/mainchat')
 def chat_message(message):
   print("message = ", message)
+  print(message['data'])
   emit('message', {'data': message['data']}, broadcast=True)
 
 @socketio.on('connect', namespace='/mainchat')
