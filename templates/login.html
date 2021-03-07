@@ -21,19 +21,14 @@
           //}
         //})
     //})
-    function check() {
-        //event.preventDefault();
-        //alert('ert')
-        if ($("#nickname").val() !== '') {
-            //alert('qwerwfgd');
-            //console.log('werty')
-            $.cookie("realtime-chat-nickname", $("#nickname").val());
-            window.location = "/redir";
-        }
-        return false;
-    }
+
     function setName() {
       $.cookie("realtime-chat-nickname", $("#nickname").val());
+      if ($.cookie("oldroom")) {
+        $('input[name=oldroom]').val($.cookie("oldroom"));
+      } else {
+        $('input[name=oldroom]').val("mainchat");
+      }
     }
   </script>
   <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
@@ -45,6 +40,22 @@
 </head>
 
 <body>
+
+  <div class="container" style="min-height:100% width:80%">
+	{% with messages = get_flashed_messages() %}
+	  {% if messages %}
+	    {% for message in messages %}
+		  <div class="alert alert-warning alert-dismissible" role="alert">
+		  <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button>
+			{{message}}
+		  </div>
+		{% endfor %}
+	  {% endif %}
+	{% endwith %}
+
+	{% block body %}{% endblock %}
+	</div>
+
   <div class="container" style="padding-top: 50px">
     <div class="row">
       <div class="col-md-auto">
@@ -64,7 +75,8 @@
                 </div>
                 <button type="submit" class="btn btn-lg btn-primary" name="specific" onclick="setName()">Join Specific Room</button>
                 <br>
-                <button type="submit" class="btn btn-lg btn-primary" name="newroom" style="margin-top:10px;">Create New Room</button>
+                <button type="submit" class="btn btn-lg btn-primary" name="newroom" onclick="setName()" style="margin-top:10px;">Create New Room</button>
+                <input type="hidden" id="oldroom" name="oldroom" value="">
               </fieldset>
             </form>
           </div>

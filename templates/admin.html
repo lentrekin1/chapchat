@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head lang="en">
+    <script src="//code.jquery.com/jquery-1.11.1.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.min.js"></script>
+    <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-timeago/1.4.0/jquery.timeago.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.6/socket.io.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static',filename='styles/stylesheet.css') }}" type="text/css">
+    <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+    function findRoom() {
+        var coll = document.getElementsByClassName("collapsible");
+        var i;
+
+        for (i = 0; i < coll.length; i++) {
+            if (coll[i].nextElementSibling.style.display == "block") {
+                return coll[i].id;
+            }
+        }
+    }
+
+    //var channel = window.location.href.split('/').slice(3).join('/');
+    var channel;
+    var socket = io.connect(window.location.protocol + '//' + document.domain + ':' + location.port);
+    var receivedMsg;
+
+    socket.on('connect', function () {
+        //connect();
+        console.log('connected');
+    });
+
+    socket.on('disconnect', function(){
+      console.log("chat disconnected");
+    });
+
+    socket.on("message", function (message) {
+      receivedMsg = message;
+      refreshMessages(message);
+    });
+
+    socket.on("announcement", function (message) {
+      refreshMessages(message, type="announcement");
+    });
+
+    function refreshMessages(message, type="message") {
+
+      var $panel = $('#scrollbox');
+      var shouldScroll = $panel[0].scrollHeight - $panel.height() - 31 <= $panel.scrollTop();
+
+      if (type == "message") {
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '&#60;' + message.data.author + '&#62;' + ': ' + message.data.message  + '<br/></div></div></div></li>');
+      //$('#scrollbox').stop().animate({scrollTop: $('#scrollbox').get(0).scrollHeight}, "fast");
+      }
+
+      if (type == "announcement") {
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + '&#60;' + message.data + '&#62;' + '<br/></div></div></div></li>');
+      }
+
+      if (shouldScroll) {
+        $panel.scrollTop($panel[0].scrollHeight);
+      }
+
+    }
+
+    $(function () {
+        $("#sendMessage").on("click", function () {
+          sendMessage()
+        });
+
+        $('#messageText').keyup(function (e) {
+          if (e.keyCode == 13) {
+            sendMessage();
+          }
+        });
+      })
+
+    function sendMessage() {
+        if (typeof findRoom() !== "undefined") {
+            $container = $('.media-list');
+            $container[0].scrollTop = $container[0].scrollHeight;
+            var message = $("#messageText").val();
+            var author = $.cookie("realtime-chat-nickname");
+            socket.emit('admin announcement', {data: message, room: channel, pass: $.cookie("pass")});
+            $("#messageText").val("");
+            $('#scrollbox').stop().animate({scrollTop: $('#scrollbox').get(0).scrollHeight}, "fast");
+        } else {
+            $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">Enter a room to send messages<br/></div></div></div></li>');
+        }
+    }
+
+    function displayUsers(id) {
+        var coll = document.getElementsByClassName("collapsible");
+        var i;
+        for (i = 0; i < coll.length; i++) {
+            if (coll[i].id !== id) {
+                coll[i].classList.remove("active");
+                var content = coll[i].nextElementSibling;
+                content.style.display = "none";
+            } else {
+                coll[i].classList.add("active");
+                var content = coll[i].nextElementSibling;
+                content.style.display = "block";
+            }
+        }
+    }
+
+    function connect() {
+        if (typeof findRoom() !== "undefined" && typeof findRoom() !== channel) {
+            $(".media-list").empty();
+            channel = findRoom();
+            document.getElementById('room').innerHTML = channel;
+            socket.emit('admin connect', { data: {message: 'admin connected!', room: channel, user: 'admin', pass: $.cookie("pass")} });
+        } else {
+            $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">Please select a (new) room to join<br/></div></div></div></li>');
+        }
+    }
+
+    function dc() {
+        socket.emit('admin disconnect', {data: {room: channel, user: 'admin', pass: $.cookie("pass")}});
+        window.location.reload()
+    }
+
+    window.onbeforeunload = function () {
+        dc();
+        //document.cookie = 'pass=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    }
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+</head>
+
+<body>
+    <br>
+    <div class="panel panel-primary col-md-11">
+        <div class="panel-body">There are {{ totalnum }} people in {{ rooms|length }} rooms</div>
+    </div>
+    <div class="row">
+      <div id="chatbox">
+        <div class="panel panel-info col-md-11">
+          <div class="panel-heading">
+            <strong id="room">Not connected to a room</strong>
+          </div>
+          <div class="panel-body fixed-panel" style="max-height: 10;overflow-y: scroll;" id="scrollbox">
+            <ul class="media-list">
+                <li class="media"><div class="media-body"><div class="media"><div class="media-body">Enter a room to see messages<br/></div></div></div></li>
+            </ul>
+          </div>
+          <div class="panel-footer">
+            <div class="input-group">
+              <input type="text" class="form-control" placeholder="Enter Message" id="messageText" autofocus/>
+              <span class="input-group-btn">
+                <button class="btn btn-info" type="button" id="sendMessage">SEND <span class="glyphicon glyphicon-send"></span></button>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="btn btn-info" onclick="connect()" style="margin:5px;">Join room</button>
+    <button type="button" class="btn btn-info" onclick="dc()" style="margin:5px;">Leave room</button>
+
+    {% for room in rooms %}
+    <button type="button" class="collapsible" id="{{ room.name }}" onclick="displayUsers(this.id);">{{ room.name }}: {{ room.people|length }} members</button>
+    <div class="content">
+        {% for person in room.people %}
+        <p>{{ person }}</p>
+        {% endfor %}
+    </div>
+    {% endfor %}
+
+</body>
+
+</html>

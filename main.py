@@ -1,113 +1,240 @@
-from flask import Flask, render_template, session, request, redirect
-from flask_socketio import SocketIO, emit, join_room
-import csv
+from flask import Flask, render_template, session, request, redirect, flash
+from flask_socketio import SocketIO, emit, join_room, leave_room
+from flask_login import current_user, login_user, LoginManager, UserMixin
+import csv, hashlib, hmac, time, random
 
 app = Flask(__name__)
 app.debug = True
 app.config['SECRET_KEY'] = 'wretrgf4t$R@#efdvbyj5w'
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'admin'
 socketio = SocketIO(app)
 socketio.init_app(app, cors_allowed_origins='*')#['https://'+url, 'http://'+url])
+
+hash = b'>\xf4\x88\xd5\xc464\x9a\x14\xb7n\xdc\xbf\xaa\xa2\xed\xb5|P\xa3bq\xb1\xa6b[\xcd\xe6_b7\xff'
+salt = b'L\xb6\x113"\x90)\x08\x14\x07\x17b1I\x0c'
+
+class room():
+  def __init__(self, name):
+    self.name = name
+    self.people = []
 
 def load_rooms():
   r = []
   with open('info/rooms.csv', 'r') as f:
     reader = csv.reader(f)
     for i in reader:
-      r.append(i)
+      r.append(room(str(i[0])))
     return r
+
 
 rooms = load_rooms()
 
-#todo in chat.html: add check for io.connect to connect to private room
-#todo add checking  to make sure input is valid according to rules i havnt made yet for all val_ funcs
+def get_room(name):
+  for r in rooms:
+    if r.name == name:
+      return r
+  return False
+
+min_len = 3
+max_len = 15
+
+banned_rooms = ['admin']
+
+#todo add validation for user msgs?
+
+def val_pw(pw):
+  if pw:
+    if len(pw) < 20:
+      if hmac.compare_digest(hash, hashlib.pbkdf2_hmac('sha256', pw.encode(), salt, 100000)):
+        return True
+      else:
+        return 'Incorrect password'
+    else:
+      return 'Please enter a shorter password'
+  else:
+    return 'Please enter a password'
 
 def val_room(name):
   if name:
-    return True
+    if min_len < len(name):
+      if max_len > len(name):
+        if name.isalnum():
+          if not name in banned_rooms:
+            if not get_room(name):
+              return True
+            else:
+              return 'Room name already in use'
+          else:
+            return 'Room name is not allowed'
+        else:
+          return 'Room name can only have letters and numbers'
+      else:
+        return 'Please enter a shorter room name'
+    else:
+      return 'Please enter a longer room name'
+  else:
+    return 'Please enter room name'
 
 def val_nick(nick):
   if nick:
-    return True
+    if min_len < len(nick):
+      if max_len > len(nick):
+        if nick.isalnum():
+          return True
+        else:
+          return 'Nickname can only have letters and numbers'
+      else:
+        return 'Please enter a shorter nickname'
+    else:
+      return 'Please enter a longer nickname'
+  else:
+    return 'Please enter a nickname'
+
+class User(UserMixin):
+  def __init__(self, id):
+    self.id = id
+
+def get_id(self):
+  return 'admin'
+
+def get_total_users():
+  t = 0
+  for r in rooms:
+    t += len(r.people)
+  return t
+
+@login_manager.user_loader
+def load_user(user_id):
+  return User(user_id)
 
 @app.route('/')
 def chat():
-  #todo add check cookies to see if in private room
-  if 'realtime-chat-nickname' in request.cookies and val_nick(request.cookies['realtime-chat-nickname']):
-    return redirect('/mainchat')
-  else:
-    return redirect('/login')
-
-'''@app.route('/redir')
-def redir():
-  print(request.form)
-  print(request.form.get("room"))
-  if request.form.get('specific'):
-    print('wert')
-  return 'e'
-  '''
-
-'''@app.route('/mainchat')
-def mainchat():
-  return render_template('chat.html')'''
+  '''if 'realtime-chat-nickname' in request.cookies and val_nick(request.cookies['realtime-chat-nickname']):
+    if "oldroom" in request.cookies and request.cookies["oldroom"]:
+      if request.cookies['oldroom'] in rooms:
+        return redirect('/' + request.cookies["oldroom"])
+      else:
+        return
+    else:
+      return redirect('/mainchat')
+  else:'''
+  return redirect('/login')
 
 @app.errorhandler(404)
 def err_404(e):
   return render_template('404.html'), 404
 
-#todo finish creating new room screen and implement multiple rooms/pws/ etc
 @app.route('/newroom', methods=['GET', 'POST'])
 def newroom():
   if request.method == 'POST':
     name = request.form.get('roomname')
-    if name and val_room(name):
-        rooms.append(name)
+    result = val_room(name)
+    if result == True:
+        rooms.append(room(name))
+        #get_room(request.form.get('roomname')).people.append(request.cookies.get('realtime-chat-nickname'))
         return redirect('/'+str(name))
+    else:
+        flash(result)
     #print(request.form.get('roomname'))
 
   return render_template('newroom.html')
 
+@app.route('/admin', methods=['GET', 'POST'])
+def admin():
+  if current_user.is_authenticated:
+    return render_template('admin.html', rooms=rooms, totalnum=get_total_users())
+  if request.method == 'POST':
+    result = val_pw(request.form.get('pass'))
+    if result == True:
+      login_user(User('admin'))
+      return render_template('admin.html', rooms=rooms, totalnum=get_total_users())
+    else:
+      flash(result)
+  return render_template('adminlogin.html')
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
   if request.method == 'POST':
-    print(request.form)
-    if 'main' in request.form.keys() and request.form.get('nickname'):
-      return redirect('/mainchat')
-    elif 'specific' in request.form.keys() and request.form.get('room') and request.form.get('nickname'):
-      return redirect('/' + request.form.get('room'))
+    result = val_nick(request.form.get('nickname'))
+    if not request.form.get('nickname') or not result == True:
+      flash(result)
+    elif 'main' in request.form.keys():
+        #get_room('mainchat').people.append(request.form.get('nickname'))
+        return redirect('/mainchat')
+    elif 'specific' in request.form.keys():
+      if request.form.get('room'):
+        if get_room(request.form.get('room')):
+          #get_room(request.form.get('room')).people.append(request.form.get('nickname'))
+          return redirect('/' + request.form.get('room'))
+        else:
+          flash('Room not found')
+      else:
+        flash('Please enter a room key')
     elif 'newroom' in request.form.keys():
       return redirect('/newroom')
-    else:
-      return render_template('login.html')
     #print(list(request.form.keys()))
-  #todo add test to see if login info valid - prob on both client and server
   return render_template('login.html')
 
-#todo add x has LEFT the server message
-#todo sending messages to main chat works- do priv chats
-#todo add check so user cant impersonate server - prob make server msgs red or smthn
 @app.route('/<name>')
 def priv_room(name):
-  print(request.cookies)
-  if name in rooms or name == 'mainchat':
+  if get_room(name):
     if 'realtime-chat-nickname' in request.cookies:
-      print(f'{request.cookies["realtime-chat-nickname"]} has joined the server')
-      socketio.emit('announcement', {'data': f'{request.cookies["realtime-chat-nickname"]} has joined the server'}, broadcast=True, namespace='/mainchat')
       return render_template('chat.html')
     else:
       return redirect('/login')
   return render_template('404.html'), 404
 
-@socketio.on('message', namespace='/mainchat')
+@socketio.on('message')
 def chat_message(message):
-  print("message = ", message)
   print(message['data'])
-  emit('message', {'data': message['data']}, broadcast=True)
+  emit('message', {'data': message['data']}, room=message['data']['room'])
 
-@socketio.on('connect', namespace='/mainchat')
+@socketio.on('connect')
 def test_connect():
   emit('my response', {'data': 'Connected', 'count': 0})
 
-#todo start implementing desired features (ex. user count, admin panel, multiple rooms?, etc.)
+@socketio.on('leave')
+def leave(data, admin=False):
+  leave_room(data['data']['room'])
+  if admin and val_pw(data['data']['pass']) == True:
+    print('admin dc')
+  else:
+    get_room(data['data']['room']).people.remove(data["data"]["user"])
+    print(f'user {data["data"]["user"]} left room {data["data"]["room"]}')
+    emit('announcement', {'data': f'{data["data"]["user"]} has left the server'}, room=data['data']['room'])
+
+@socketio.on('set connection')
+def set_connect(data, admin=False):
+  join_room(data['data']['room'])
+  if admin and val_pw(data['data']['pass']) == True:
+    print('admin connect')
+  else:
+    get_room(data['data']['room']).people.append(data["data"]["user"])
+    print(f'{request.cookies["realtime-chat-nickname"]} has joined the server')
+    emit('announcement', {'data': f'{data["data"]["user"]} has joined the server'}, room=data['data']['room'])
+
+@socketio.on('admin connect')
+def admin_conect(data):
+  print(data)
+  if val_pw(data['data']['pass']) == True:
+    set_connect(data, admin=True)
+
+@socketio.on('admin disconnect')
+def admin_disconect(data):
+  print(data)
+  if val_pw(data['data']['pass']) == True:
+    leave(data, admin=True)
+
+@socketio.on('admin announcement')
+def announce(message):
+  print(message)
+  print(message['pass'])
+  print(val_pw(message['pass']))
+  if val_pw(message['pass']) == True:
+    print(message['data'])
+    emit('announcement', {'data': message['data']}, room=message['room'])
 
 if __name__ == '__main__':
   socketio.run(app)
@@ -116,14 +243,14 @@ if __name__ == '__main__':
 
 ##############
 #
-# todo sooooooo it appears to work but u have to connect w/ vpn (https://chap-chat-test-305403.wm.r.appspot.com)
+# sooooooo it appears to work but u have to connect w/ vpn (https://chap-chat-test-305403.wm.r.appspot.com)
 # prob start actually making this good
 ##############
 
 
 
 ######### old ############
-#todo stil lgetting error 400 from socketio but only on gcp not local
+#stil lgetting error 400 from socketio but only on gcp not local
 #seems to get better after a few min
 # see https://stackoverflow.com/questions/65144726/app-engine-flask-socketio-server-cors-allowed-origins-header-is-missing
 #and https://stackoverflow.com/questions/65189422/flask-docker-container-socketio-issues
