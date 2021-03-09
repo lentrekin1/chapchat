@@ -3,8 +3,7 @@
 -send pics - DONE
     -prob disable in gen chat - DONE
 -save/show old chats when person enters room
--emotes
--time stamps on msgs + join/leave
+-time stamps on msgs + join/leave - DONE
 -room creator can kick/invite people
     -once creator leaves oldest member becomes room admin
 -direct invite links

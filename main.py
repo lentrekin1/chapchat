@@ -2,6 +2,7 @@ from flask import Flask, render_template, session, request, redirect, flash
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_login import current_user, login_user, LoginManager, UserMixin
 import csv, hashlib, hmac, time, random, os
+from datetime import datetime
 
 app = Flask(__name__)
 app.debug = True
@@ -31,7 +32,6 @@ def load_rooms():
   with open('info/rooms.csv', 'r') as f:
     reader = csv.reader(f)
     for i in reader:
-      print(i)
       r.append(room(str(i[0])))
     return r
 #todo add method from admin panel to delete/save rooms (save to csv file)
@@ -42,7 +42,7 @@ def get_room(name):
   for r in rooms:
     if r.name == name:
       return r
-  return False
+  raise Exception(f'Room {name} not found')
 
 min_len = 3
 max_len = 15
@@ -114,6 +114,9 @@ def get_total_users():
 
 def get_hash(pw):
   return hashlib.pbkdf2_hmac('sha256', pw.encode(), salt, 100000)
+
+def timestamp():
+  return datetime.now().strftime('%I:%M %p')
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -198,14 +201,16 @@ def priv_room(name):
 
 @socketio.on('message')
 def chat_message(message):
-  print(message['data'])
+  message['data']['timestamp'] = timestamp()
   emit('message', {'data': message['data']}, room=message['data']['room'])
 
+#todo add logging
 #todo make it so admin/maybe room creator can allow/disallow sending pics - on creation or later or both?
 #todo make it so can see full photo when zoomed in on mobile
 @socketio.on('photo')
 def photo(data):
   if data['data']['room'] != 'mainchat':
+    data['data']['timestamp'] = timestamp()
     emit('photo', {'data': data['data']}, room=data['data']['room'])
 
 @socketio.on('connect')
@@ -214,13 +219,15 @@ def test_connect():
 
 @socketio.on('leave')
 def leave(data, admin=False):
+  data['data']['timestamp'] = timestamp()
   leave_room(data['data']['room'])
   if admin and val_pw(data['data']['pass']) == True:
-    print('admin dc')
+    #print('admin dc')
+    pass
   else:
     get_room(data['data']['room']).people.remove(data["data"]["user"])
-    print(f'user {data["data"]["user"]} left room {data["data"]["room"]}')
-    emit('announcement', {'data': f'{data["data"]["user"]} has left the server'}, room=data['data']['room'])
+    #print(f'user {data["data"]["user"]} left room {data["data"]["room"]}')
+    emit('announcement', {'data': {'message': f'{data["data"]["user"]} has left the server', 'timestamp': timestamp()}}, room=data['data']['room'])
 
 @socketio.on('set connection')
 def set_connect(data, admin=False):
@@ -230,28 +237,33 @@ def set_connect(data, admin=False):
   else:
     get_room(data['data']['room']).people.append(data["data"]["user"])
     print(f'{request.cookies["realtime-chat-nickname"]} has joined the server')
-    emit('announcement', {'data': f'{data["data"]["user"]} has joined the server'}, room=data['data']['room'])
+    emit('announcement', {'data': {'message': f'{data["data"]["user"]} has joined the server', 'timestamp': timestamp()}}, room=data['data']['room'])
 
 @socketio.on('admin connect')
 def admin_conect(data):
-  print(data)
+  data['data']['timestamp'] = timestamp()
   if val_pw(data['data']['pass']) == True:
     set_connect(data, admin=True)
 
 @socketio.on('admin disconnect')
 def admin_disconect(data):
-  print(data)
+  data['data']['timestamp'] = timestamp()
   if val_pw(data['data']['pass']) == True:
     leave(data, admin=True)
 
 @socketio.on('admin announcement')
 def announce(message):
+  message['data']['timestamp'] = timestamp()
   print(message)
-  print(message['pass'])
-  print(val_pw(message['pass']))
-  if val_pw(message['pass']) == True:
-    print(message['data'])
-    emit('announcement', {'data': message['data']}, room=message['room'])
+  if val_pw(message['data']['pass']) == True:
+    emit('announcement', {'data': message['data']}, room=message['data']['room'])
+
+@socketio.on('admin photo')
+def announce(message):
+  message['data']['timestamp'] = timestamp()
+  print(message)
+  if val_pw(message['data']['pass']) == True:
+    emit('announcement photo', {'data': message['data']}, room=message['data']['room'])
 
 if __name__ == '__main__':
   socketio.run(app)

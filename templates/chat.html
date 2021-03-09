@@ -49,28 +49,38 @@
 
     socket.on("photo", function (message) {
       refreshMessages(message, type="photo");
-    })
+    });
+
+    socket.on("announcement photo", function (message) {
+      refreshMessages(message, type="announcement photo");
+    });
 
     socket.on("announcement", function (message) {
       refreshMessages(message, type="announcement");
-    })
+    });
 
     function refreshMessages(message, type="message") {
-
       var $panel = $('#scrollbox');
       var shouldScroll = $panel[0].scrollHeight - $panel.height() - 31 <= $panel.scrollTop();
 
       if (type == "message") {
-      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '&#60;' + message.data.author + '&#62;' + ': ' + message.data.message  + '<br/></div></div></div></li>');
-      //$('#scrollbox').stop().animate({scrollTop: $('#scrollbox').get(0).scrollHeight}, "fast");
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '&#60;' + message.data.author + '&#62;' + ': ' + message.data.message + '<br/></div></div></div></li>');
+      $(".media-list").append('<small>' + message.data.timestamp + '</small>');
       }
 
       if (type == "announcement") {
-      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + '&#60;' + message.data + '&#62;' + '<br/></div></div></div></li>');
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + '&#60;' + message.data.message + '&#62;' + '<br/></div></div></div></li>');
+      $(".media-list").append('<small style="color:red;">' + message.data.timestamp + '</small>');
+      }
+
+      if (type == "announcement photo") {
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + '&#60;' + '<img src="' + message.data.photo + '" width="300" height="300" onclick="showFull(this)"/>' + '&#62;' + '<br/></div></div></div></li>');
+      $(".media-list").append('<small style="color:red;">' + message.data.timestamp + '</small>');
       }
 
       if (type == "photo") {
-      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '&#60;' + message.data.author + '&#62;' + ': ' + '<img src="' + message.data.photo + '" width="300" height="300" onclick="showFull(this)"/>'  + '<br/></div></div></div></li>');
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '&#60;' + message.data.author + '&#62;' + ': ' + '<img src="' + message.data.photo + '" width="300" height="300" onclick="showFull(this)"/>' + '<br/></div></div></div></li>');
+      $(".media-list").append('<small>' + message.data.timestamp + '</small>');
       }
 
       if (shouldScroll) {

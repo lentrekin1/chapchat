@@ -41,22 +41,40 @@
       refreshMessages(message);
     });
 
+    socket.on("photo", function (message) {
+      refreshMessages(message, type="photo");
+    });
+
+    socket.on("announcement photo", function (message) {
+      refreshMessages(message, type="announcement photo");
+    });
+
     socket.on("announcement", function (message) {
       refreshMessages(message, type="announcement");
     });
 
     function refreshMessages(message, type="message") {
-
       var $panel = $('#scrollbox');
       var shouldScroll = $panel[0].scrollHeight - $panel.height() - 31 <= $panel.scrollTop();
 
       if (type == "message") {
       $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '&#60;' + message.data.author + '&#62;' + ': ' + message.data.message  + '<br/></div></div></div></li>');
-      //$('#scrollbox').stop().animate({scrollTop: $('#scrollbox').get(0).scrollHeight}, "fast");
+      $(".media-list").append('<small>' + message.data.timestamp + '</small>');
       }
 
       if (type == "announcement") {
-      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + '&#60;' + message.data + '&#62;' + '<br/></div></div></div></li>');
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + '&#60;' + message.data.message + '&#62;' + '<br/></div></div></div></li>');
+      $(".media-list").append('<small style="color:red;">' + message.data.timestamp + '</small>');
+      }
+
+      if (type == "announcement photo") {
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + '&#60;' + '<img src="' + message.data.photo + '" width="300" height="300" onclick="showFull(this)"/>' + '&#62;' + '<br/></div></div></div></li>');
+      $(".media-list").append('<small style="color:red;">' + message.data.timestamp + '</small>');
+      }
+
+      if (type == "photo") {
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '&#60;' + message.data.author + '&#62;' + ': ' + '<img src="' + message.data.photo + '" width="300" height="300" onclick="showFull(this)"/>' + '<br/></div></div></div></li>');
+      $(".media-list").append('<small>' + message.data.timestamp + '</small>');
       }
 
       if (shouldScroll) {
@@ -81,14 +99,46 @@
         if (typeof findRoom() !== "undefined") {
             $container = $('.media-list');
             $container[0].scrollTop = $container[0].scrollHeight;
+            var author = $.cookie("realtime-chat-nickname");
+            var photo = document.getElementById('photo').files[0];
+            if (typeof photo === "undefined") {
+              var message = $("#messageText").val();
+              socket.emit('admin announcement', { data: { message: message, room: channel, pass: $.cookie("pass")} });
+              $("#messageText").val("");
+            } else {
+              var reader = new FileReader();
+              reader.onload = function(evt){
+                  var msg = evt.target.result;
+                  socket.emit('admin photo', { data: { photo: msg, room: channel, pass: $.cookie("pass")} });
+              };
+              reader.readAsDataURL(photo);
+              previewImg();
+            }
+            $('#scrollbox').stop().animate({scrollTop: $('#scrollbox').get(0).scrollHeight}, "fast");
+
+            /*$container = $('.media-list');
+            $container[0].scrollTop = $container[0].scrollHeight;
             var message = $("#messageText").val();
             var author = $.cookie("realtime-chat-nickname");
             socket.emit('admin announcement', {data: message, room: channel, pass: $.cookie("pass")});
             $("#messageText").val("");
-            $('#scrollbox').stop().animate({scrollTop: $('#scrollbox').get(0).scrollHeight}, "fast");
+            $('#scrollbox').stop().animate({scrollTop: $('#scrollbox').get(0).scrollHeight}, "fast");*/
         } else {
             $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">Enter a room to send messages<br/></div></div></div></li>');
         }
+    }
+
+    function previewImg() {
+      if (document.getElementById('remimg').style.display === 'none') {
+        document.getElementById('remimg').style.display = '';
+        document.getElementById('preview').style.display = '';
+        document.getElementById('preview').src = window.URL.createObjectURL(document.getElementById('photo').files[0])
+      } else {
+        document.getElementById('remimg').style.display = 'none';
+        document.getElementById('preview').style.display = 'none';
+        document.getElementById('preview').src = '#'
+        document.getElementById("photo").value = "";
+      }
     }
 
     function displayUsers(id) {
@@ -127,7 +177,22 @@
         dc();
         //document.cookie = 'pass=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     }
+
+    function showFull(e) {
+      if (e.height === 300 && e.width === 300) {
+        e.height = 500;
+        e.width = 500;
+      } else {
+        e.height = 300;
+        e.width = 300;
+      }
+    }
     </script>
+    <style type="text/css">
+        input[type="file"] {
+           display: none;
+        }
+    </style>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 </head>
 
@@ -148,12 +213,14 @@
             </ul>
           </div>
           <div class="panel-footer">
-            <div class="input-group">
               <input type="text" class="form-control" placeholder="Enter Message" id="messageText" autofocus/>
-              <span class="input-group-btn">
-                <button class="btn btn-info" type="button" id="sendMessage">SEND <span class="glyphicon glyphicon-send"></span></button>
-              </span>
-            </div>
+              <label for="photo" class="btn btn-info" id="photowrap">
+                <input type="file" id="photo" accept=".jpg, .jpeg, .png" onchange="previewImg(this)">
+                  Upload an image
+              </label>
+            <button class="btn btn-info" type="button" id="sendMessage">SEND <span class="glyphicon glyphicon-send"></span></button>
+            <img id="preview" src="#" width="100" height="100" style="display: none;">
+            <button id="remimg" class="btn btn-info" onclick="previewImg(this)" style="display: none;">Remove Image</button>
           </div>
         </div>
       </div>
