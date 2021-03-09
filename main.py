@@ -27,8 +27,8 @@ def load_rooms():
     for i in reader:
       r.append(room(str(i[0])))
     return r
-
-
+#todo add method from admin panel to delete/save rooms (save to csv file)
+#todo figure out why invalid ssl from GCP
 rooms = load_rooms()
 
 def get_room(name):
@@ -46,15 +46,15 @@ banned_rooms = ['admin']
 
 def val_pw(pw):
   if pw:
-    if len(pw) < 20:
-      if hmac.compare_digest(hash, hashlib.pbkdf2_hmac('sha256', pw.encode(), salt, 100000)):
-        return True
+      if len(pw) < 20:
+        if hmac.compare_digest(hash, hashlib.pbkdf2_hmac('sha256', pw.encode(), salt, 100000)):
+          return True
+        else:
+          return 'Incorrect password'
       else:
-        return 'Incorrect password'
-    else:
-      return 'Please enter a shorter password'
+        return 'Please enter a shorter password'
   else:
-    return 'Please enter a password'
+    return 'Please provide a password'
 
 def val_room(name):
   if name:
@@ -105,6 +105,9 @@ def get_total_users():
     t += len(r.people)
   return t
 
+def get_hash(pw):
+  return hashlib.pbkdf2_hmac('sha256', pw.encode(), salt, 100000)
+
 @login_manager.user_loader
 def load_user(user_id):
   return User(user_id)
@@ -149,7 +152,7 @@ def admin():
     result = val_pw(request.form.get('pass'))
     if result == True:
       login_user(User('admin'))
-      return render_template('admin.html', rooms=rooms, totalnum=get_total_users())
+      return render_template('admin.html', rooms=rooms, totalnum=get_total_users(), phash=get_hash(request.form.get('pass')))
     else:
       flash(result)
   return render_template('adminlogin.html')
@@ -190,6 +193,13 @@ def priv_room(name):
 def chat_message(message):
   print(message['data'])
   emit('message', {'data': message['data']}, room=message['data']['room'])
+
+#todo make it so admin/maybe room creator can allow/disallow sending pics - on creation or later or both?
+#todo make it so can see full photo when zoomed in on mobile
+@socketio.on('photo')
+def photo(data):
+  if data['data']['room'] != 'mainchat':
+    emit('photo', {'data': data['data']}, room=data['data']['room'])
 
 @socketio.on('connect')
 def test_connect():
@@ -241,8 +251,8 @@ if __name__ == '__main__':
 
 
 
+
 ##############
-#
 # sooooooo it appears to work but u have to connect w/ vpn (https://chap-chat-test-305403.wm.r.appspot.com)
 # prob start actually making this good
 ##############
@@ -250,7 +260,7 @@ if __name__ == '__main__':
 
 
 ######### old ############
-#stil lgetting error 400 from socketio but only on gcp not local
+#stil getting error 400 from socketio but only on gcp not local
 #seems to get better after a few min
 # see https://stackoverflow.com/questions/65144726/app-engine-flask-socketio-server-cors-allowed-origins-header-is-missing
 #and https://stackoverflow.com/questions/65189422/flask-docker-container-socketio-issues

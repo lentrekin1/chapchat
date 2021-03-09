@@ -1,0 +1,12 @@
+-chap colored theme
+-more visually appealing
+-send pics - DONE
+    -prob disable in gen chat - DONE
+-save/show old chats when person enters room
+-emotes
+-time stamps on msgs + join/leave
+-room creator can kick/invite people
+    -once creator leaves oldest member becomes room admin
+-direct invite links
+-break into multiple .py files?
+-add change admin pw function

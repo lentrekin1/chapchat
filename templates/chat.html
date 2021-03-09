@@ -24,10 +24,13 @@
 
     var channel = window.location.href.split('/').slice(3).join('/');
     var socket = io.connect(window.location.protocol + '//' + document.domain + ':' + location.port);
-    var receivedMsg;
+    //var receivedMsg;
 
     window.onload = function(){
       document.getElementById('room').innerHTML = channel;
+      if (channel === 'mainchat') {
+        document.getElementById('photowrap').style.display = 'none';
+      }
     }
 
     socket.on('connect', function () {
@@ -40,9 +43,13 @@
     });
 
     socket.on("message", function (message) {
-      receivedMsg = message;
+      //receivedMsg = message;
       refreshMessages(message);
     });
+
+    socket.on("photo", function (message) {
+      refreshMessages(message, type="photo");
+    })
 
     socket.on("announcement", function (message) {
       refreshMessages(message, type="announcement");
@@ -62,6 +69,10 @@
       $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + '&#60;' + message.data + '&#62;' + '<br/></div></div></div></li>');
       }
 
+      if (type == "photo") {
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '&#60;' + message.data.author + '&#62;' + ': ' + '<img src="' + message.data.photo + '" width="300" height="300" onclick="showFull(this)"/>'  + '<br/></div></div></div></li>');
+      }
+
       if (shouldScroll) {
         $panel.scrollTop($panel[0].scrollHeight);
       }
@@ -71,7 +82,6 @@
     $(function () {
 
       if (typeof $.cookie("realtime-chat-nickname") === 'undefined') {
-        //alert('wertyuytrew')
         window.location = "/login"
       } else {
         $("#sendMessage").on("click", function () {
@@ -88,17 +98,52 @@
       function sendMessage() {
         $container = $('.media-list');
         $container[0].scrollTop = $container[0].scrollHeight;
-        var message = $("#messageText").val();
         var author = $.cookie("realtime-chat-nickname");
-        socket.emit('message', { data: { message: message, author: author, room: channel} });
-        $("#messageText").val("");
+        var photo = document.getElementById('photo').files[0];
+        if (typeof photo === "undefined") {
+          var message = $("#messageText").val();
+          socket.emit('message', { data: { message: message, author: author, room: channel} });
+          $("#messageText").val("");
+        } else {
+          var reader = new FileReader();
+          reader.onload = function(evt){
+              var msg = evt.target.result;
+              socket.emit('photo', { data: { photo: msg, author: author, room: channel} });
+          };
+          reader.readAsDataURL(photo);
+          previewImg();
+        }
         $('#scrollbox').stop().animate({scrollTop: $('#scrollbox').get(0).scrollHeight}, "fast");
       }
     })
+
     function leaveRoom() {
       $.cookie("old-nickname", $.cookie("realtime-chat-nickname"));
       document.cookie = 'realtime-chat-nickname=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
       window.location.reload()
+    }
+
+    function previewImg() {
+      if (document.getElementById('remimg').style.display === 'none') {
+        document.getElementById('remimg').style.display = '';
+        document.getElementById('preview').style.display = '';
+        document.getElementById('preview').src = window.URL.createObjectURL(document.getElementById('photo').files[0])
+      } else {
+        document.getElementById('remimg').style.display = 'none';
+        document.getElementById('preview').style.display = 'none';
+        document.getElementById('preview').src = '#'
+        document.getElementById("photo").value = "";
+      }
+    }
+
+    function showFull(e) {
+      if (e.height === 300 && e.width === 300) {
+        e.height = 500;
+        e.width = 500;
+      } else {
+        e.height = 300;
+        e.width = 300;
+      }
     }
   </script>
   <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
@@ -111,6 +156,10 @@
 
     .media-list {
       overflow: auto;
+    }
+
+    input[type="file"] {
+    display: none;
     }
   </style>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
@@ -133,12 +182,14 @@
             </ul>
           </div>
           <div class="panel-footer">
-            <div class="input-group">
               <input type="text" class="form-control" placeholder="Enter Message" id="messageText" autofocus/>
-              <span class="input-group-btn">
-                <button class="btn btn-info" type="button" id="sendMessage">SEND <span class="glyphicon glyphicon-send"></span></button>
-              </span>
-            </div>
+              <label for="photo" class="btn btn-info" id="photowrap">
+                <input type="file" id="photo" accept=".jpg, .jpeg, .png" onchange="previewImg(this)">
+                  Upload an image
+              </label>
+            <button class="btn btn-info" type="button" id="sendMessage">SEND <span class="glyphicon glyphicon-send"></span></button>
+            <img id="preview" src="#" width="100" height="100" style="display: none;">
+            <button id="remimg" class="btn btn-info" onclick="previewImg(this)" style="display: none;">Remove Image</button>
           </div>
         </div>
       </div>
