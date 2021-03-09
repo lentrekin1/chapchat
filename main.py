@@ -1,7 +1,7 @@
 from flask import Flask, render_template, session, request, redirect, flash
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_login import current_user, login_user, LoginManager, UserMixin
-import csv, hashlib, hmac, time, random
+import csv, hashlib, hmac, time, random, os
 
 app = Flask(__name__)
 app.debug = True
@@ -22,9 +22,16 @@ class room():
 
 def load_rooms():
   r = []
+  if not os.path.isdir('info'):
+    os.mkdir('info')
+  if not os.path.isfile('info/rooms.csv'):
+    with open('info/rooms.csv', 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['mainchat'])
   with open('info/rooms.csv', 'r') as f:
     reader = csv.reader(f)
     for i in reader:
+      print(i)
       r.append(room(str(i[0])))
     return r
 #todo add method from admin panel to delete/save rooms (save to csv file)
