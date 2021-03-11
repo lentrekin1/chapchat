@@ -10,7 +10,6 @@
   <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-timeago/1.4.0/jquery.timeago.min.js"></script>
   <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.6/socket.io.min.js"></script>
   <script>
-
     window.onbeforeunload = function () {
       var old;
       if (typeof $.cookie("old-nickname") !== 'undefined') {
@@ -22,9 +21,10 @@
       socket.emit('leave', {data: {room: channel, user: old}})
     }
 
-    var channel = window.location.href.split('/').slice(3).join('/');
+    var roomsDir = '/rooms/';
+    var inviteDir = '/invite/';
+    var channel = window.location.href.split('/').slice(4).join('/');
     var socket = io.connect(window.location.protocol + '//' + document.domain + ':' + location.port);
-    //var receivedMsg;
 
     window.onload = function(){
       document.getElementById('room').innerHTML = channel;
@@ -35,7 +35,6 @@
 
     socket.on('connect', function () {
       socket.emit('set connection', { data: {message: 'I\'m connected!', room: channel, user: $.cookie("realtime-chat-nickname")} });
-      $.cookie("oldroom", channel);
     });
 
     socket.on('disconnect', function(){
@@ -43,43 +42,31 @@
     });
 
     socket.on("message", function (message) {
-      //receivedMsg = message;
+      console.log('cdd');
       refreshMessages(message);
     });
 
-    socket.on("photo", function (message) {
-      refreshMessages(message, type="photo");
-    });
-
-    socket.on("announcement photo", function (message) {
-      refreshMessages(message, type="announcement photo");
-    });
-
-    socket.on("announcement", function (message) {
-      refreshMessages(message, type="announcement");
-    });
-
-    function refreshMessages(message, type="message") {
+    function refreshMessages(message) {
       var $panel = $('#scrollbox');
       var shouldScroll = $panel[0].scrollHeight - $panel.height() - 31 <= $panel.scrollTop();
 
-      if (type == "message") {
-      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '&#60;' + message.data.author + '&#62;' + ': ' + message.data.message + '<br/></div></div></div></li>');
+      if (message.data.type == "message") {
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '&#60;' + message.data.user + '&#62;' + ': ' + message.data.message + '<br/></div></div></div></li>');
       $(".media-list").append('<small>' + message.data.timestamp + '</small>');
       }
 
-      if (type == "announcement") {
+      if (message.data.type == "announcement") {
       $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + '&#60;' + message.data.message + '&#62;' + '<br/></div></div></div></li>');
       $(".media-list").append('<small style="color:red;">' + message.data.timestamp + '</small>');
       }
 
-      if (type == "announcement photo") {
+      if (message.data.type == "announcement photo") {
       $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + '&#60;' + '<img src="' + message.data.photo + '" width="300" height="300" onclick="showFull(this)"/>' + '&#62;' + '<br/></div></div></div></li>');
       $(".media-list").append('<small style="color:red;">' + message.data.timestamp + '</small>');
       }
 
-      if (type == "photo") {
-      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '&#60;' + message.data.author + '&#62;' + ': ' + '<img src="' + message.data.photo + '" width="300" height="300" onclick="showFull(this)"/>' + '<br/></div></div></div></li>');
+      if (message.data.type == "photo") {
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '&#60;' + message.data.user + '&#62;' + ': ' + '<img src="' + message.data.photo + '" width="300" height="300" onclick="showFull(this)"/>' + '<br/></div></div></div></li>');
       $(".media-list").append('<small>' + message.data.timestamp + '</small>');
       }
 
@@ -108,17 +95,17 @@
       function sendMessage() {
         $container = $('.media-list');
         $container[0].scrollTop = $container[0].scrollHeight;
-        var author = $.cookie("realtime-chat-nickname");
+        var user = $.cookie("realtime-chat-nickname");
         var photo = document.getElementById('photo').files[0];
         if (typeof photo === "undefined") {
           var message = $("#messageText").val();
-          socket.emit('message', { data: { message: message, author: author, room: channel} });
+          socket.emit('message', { data: { message: message, user: user, room: channel} });
           $("#messageText").val("");
         } else {
           var reader = new FileReader();
           reader.onload = function(evt){
               var msg = evt.target.result;
-              socket.emit('photo', { data: { photo: msg, author: author, room: channel} });
+              socket.emit('photo', { data: { photo: msg, user: user, room: channel} });
           };
           reader.readAsDataURL(photo);
           previewImg();
@@ -155,6 +142,27 @@
         e.width = 300;
       }
     }
+
+    function shareLink() {
+      try{
+        navigator.share({
+          title: 'Share a link to this chatroom',
+          text: 'Join this chatroom now!',
+          url: window.location.protocol + '//' + document.domain + inviteDir + channel
+        })
+      } catch(err) {
+        var tmp = document.createElement('input');
+        document.body.appendChild(tmp);
+        tmp.value = window.location.protocol + '//' + document.domain + inviteDir + channel
+        tmp.select();
+        document.execCommand("copy", false);
+        tmp.remove();
+        document.getElementById('share').innerHTML = '✓ Invite Link Copied';
+        setTimeout(function(){
+            document.getElementById('share').innerHTML = 'Share Invite Link';
+        }, 3000);
+      }
+    }
   </script>
   <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
   <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
@@ -186,6 +194,8 @@
         <div class="panel panel-info">
           <div class="panel-heading">
             <strong id="room"></strong>
+            <span style="display:inline-block; width: 5px;"></span>
+            <button class="btn btn-info btn-sm" id="share" onclick="shareLink()">Share Invite Link</button>
           </div>
           <div class="panel-body fixed-panel" style="max-height: 10;overflow-y: scroll;" id="scrollbox">
             <ul class="media-list">

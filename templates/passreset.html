@@ -41,21 +41,17 @@
       <div class="col-md-auto">
         <div class="login-panel panel panel-default">
           <div class="panel-heading">
-            <h3 class="panel-title">Choose a nickname to enter chat</h3>
+            <h3 class="panel-title">Change admin password</h3>
           </div>
           <div class="panel-body">
             <form role="form" name="frm-login" method="post">
               <fieldset>
                 <div class="form-group">
-                  <input class="form-control" placeholder="Enter Nickname" name="nickname" id="nickname" type="text">
+                    <input class="form-control" placeholder="Enter New Admin Password" name="newpass" id="newpass" type="password">
+                    <br>
+                    <input class="form-control" placeholder="Confirm New Admin Password" name="confirmpass" id="confirmpass" type="password">
                 </div>
-                <button type="submit" class="btn btn-lg btn-success" name="main" onclick="setName()">Enter Main Chat</button>
-                <div class="form-group">
-                  <input class="form-control" placeholder="Enter Room Code to Join Specific Room" name="room" id="room" type="text" style="margin-top:10px;">
-                </div>
-                <button type="submit" class="btn btn-lg btn-primary" name="specific" onclick="setName()">Join Specific Room</button>
-                <br>
-                <button type="submit" class="btn btn-lg btn-primary" name="newroom" onclick="setName()" style="margin-top:10px;">Create New Room</button>
+                <button type="submit" class="btn btn-lg btn-success" name="main">Change Admin Password</button>
               </fieldset>
             </form>
           </div>

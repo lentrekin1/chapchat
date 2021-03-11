@@ -23,9 +23,10 @@
     }
 
     //var channel = window.location.href.split('/').slice(3).join('/');
+    var roomsDir = '/rooms/';
     var channel;
     var socket = io.connect(window.location.protocol + '//' + document.domain + ':' + location.port);
-    var receivedMsg;
+    //var receivedMsg;
 
     socket.on('connect', function () {
         //connect();
@@ -37,42 +38,34 @@
     });
 
     socket.on("message", function (message) {
-      receivedMsg = message;
+      //receivedMsg = message;
       refreshMessages(message);
     });
 
-    socket.on("photo", function (message) {
-      refreshMessages(message, type="photo");
-    });
-
-    socket.on("announcement photo", function (message) {
-      refreshMessages(message, type="announcement photo");
-    });
-
-    socket.on("announcement", function (message) {
-      refreshMessages(message, type="announcement");
+    socket.on('pass change confirm', function (message) {
+        document.getElementById('confirm email').innerHTML = 'Password reset link sent to ' + message.data.email + '. It is valid for ' + message.data.timeout + ' minutes.';
     });
 
     function refreshMessages(message, type="message") {
       var $panel = $('#scrollbox');
       var shouldScroll = $panel[0].scrollHeight - $panel.height() - 31 <= $panel.scrollTop();
 
-      if (type == "message") {
+      if (message.data.type == "message") {
       $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '&#60;' + message.data.author + '&#62;' + ': ' + message.data.message  + '<br/></div></div></div></li>');
       $(".media-list").append('<small>' + message.data.timestamp + '</small>');
       }
 
-      if (type == "announcement") {
+      if (message.data.type == "announcement") {
       $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + '&#60;' + message.data.message + '&#62;' + '<br/></div></div></div></li>');
       $(".media-list").append('<small style="color:red;">' + message.data.timestamp + '</small>');
       }
 
-      if (type == "announcement photo") {
+      if (message.data.type == "announcement photo") {
       $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + '&#60;' + '<img src="' + message.data.photo + '" width="300" height="300" onclick="showFull(this)"/>' + '&#62;' + '<br/></div></div></div></li>');
       $(".media-list").append('<small style="color:red;">' + message.data.timestamp + '</small>');
       }
 
-      if (type == "photo") {
+      if (message.data.type == "photo") {
       $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '&#60;' + message.data.author + '&#62;' + ': ' + '<img src="' + message.data.photo + '" width="300" height="300" onclick="showFull(this)"/>' + '<br/></div></div></div></li>');
       $(".media-list").append('<small>' + message.data.timestamp + '</small>');
       }
@@ -103,26 +96,18 @@
             var photo = document.getElementById('photo').files[0];
             if (typeof photo === "undefined") {
               var message = $("#messageText").val();
-              socket.emit('admin announcement', { data: { message: message, room: channel, pass: $.cookie("pass")} });
+              socket.emit('admin announcement', { data: { message: message, room: channel, user: 'admin', pass: $.cookie("pass")} });
               $("#messageText").val("");
             } else {
               var reader = new FileReader();
               reader.onload = function(evt){
                   var msg = evt.target.result;
-                  socket.emit('admin photo', { data: { photo: msg, room: channel, pass: $.cookie("pass")} });
+                  socket.emit('admin photo', { data: { photo: msg, room: channel, user: 'admin', pass: $.cookie("pass")} });
               };
               reader.readAsDataURL(photo);
               previewImg();
             }
             $('#scrollbox').stop().animate({scrollTop: $('#scrollbox').get(0).scrollHeight}, "fast");
-
-            /*$container = $('.media-list');
-            $container[0].scrollTop = $container[0].scrollHeight;
-            var message = $("#messageText").val();
-            var author = $.cookie("realtime-chat-nickname");
-            socket.emit('admin announcement', {data: message, room: channel, pass: $.cookie("pass")});
-            $("#messageText").val("");
-            $('#scrollbox').stop().animate({scrollTop: $('#scrollbox').get(0).scrollHeight}, "fast");*/
         } else {
             $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">Enter a room to send messages<br/></div></div></div></li>');
         }
@@ -187,6 +172,10 @@
         e.width = 300;
       }
     }
+
+    function changePass() {
+        socket.emit('change admin pass', {data: {pass: $.cookie("pass")}});
+    }
     </script>
     <style type="text/css">
         input[type="file"] {
@@ -227,7 +216,8 @@
     </div>
     <button type="button" class="btn btn-info" onclick="connect()" style="margin:5px;">Join room</button>
     <button type="button" class="btn btn-info" onclick="dc()" style="margin:5px;">Leave room</button>
-
+    <button type="button" class="btn btn-info" onclick="changePass()" style="margin:5px;">Change admin password</button>
+    <strong id="confirm email"></strong>
     {% for room in rooms %}
     <button type="button" class="collapsible" id="{{ room.name }}" onclick="displayUsers(this.id);">{{ room.name }}: {{ room.people|length }} members</button>
     <div class="content">

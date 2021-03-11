@@ -2,10 +2,12 @@
 -more visually appealing
 -send pics - DONE
     -prob disable in gen chat - DONE
--save/show old chats when person enters room
+-save/show old chats when person enters room - DONE
 -time stamps on msgs + join/leave - DONE
 -room creator can kick/invite people
     -once creator leaves oldest member becomes room admin
--direct invite links
+-direct invite links - DONE
 -break into multiple .py files?
 -add change admin pw function
+-admin panel should auto update rooms/memebers - reload not required
+-add logout button for admin
