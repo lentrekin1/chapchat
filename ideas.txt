@@ -7,7 +7,7 @@
 -room creator can kick/invite people
     -once creator leaves oldest member becomes room admin
 -direct invite links - DONE
--break into multiple .py files?
--add change admin pw function
--admin panel should auto update rooms/memebers - reload not required
--add logout button for admin
+-add change admin pw function - DONE
+-admin panel should auto update rooms/members - reload not required
+-add logout button for admin - DONE
+-actually save rooms in rooms.csv

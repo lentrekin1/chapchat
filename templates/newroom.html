@@ -2,47 +2,72 @@
 <html>
 
 <head lang="en">
+    <title>New Room - ChapChats</title>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
-  <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+    <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 </head>
 
 <body>
 
-    <div class="container" style="min-height:100% width:80%">
-	{% with messages = get_flashed_messages() %}
-	  {% if messages %}
-	    {% for message in messages %}
-		  <div class="alert alert-warning alert-dismissible" role="alert">
-		  <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button>
-			{{message}}
-		  </div>
-		{% endfor %}
-	  {% endif %}
-	{% endwith %}
+<div class="container" style="min-height:100% width:80%">
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-warning alert-dismissible" role="alert">
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span>
+        </button>
+        {{message}}
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
 
-	{% block body %}{% endblock %}
-	</div>
+    {% block body %}{% endblock %}
+</div>
 
-    <div class="container" style="padding-top: 50px">
-        <div class="row">
-            <div class="col-md-4 col-md-offset-4">
-                <div class="login-panel panel panel-default">
-                  <div class="panel-heading">
+<div class="container" style="padding-top: 50px">
+    <div class="row">
+        <div class="col-md-4 col-md-offset-4">
+            <div class="login-panel panel panel-default">
+                <div class="panel-heading">
                     <h3 class="panel-title">Create a New Room</h3>
-                  </div>
-                  <div class="panel-body">
+                </div>
+                <div class="panel-body">
                     <form role="form" id="room-creation" method="post">
-                      <fieldset>
-                        <div class="form-group">
-                          <input class="form-control" placeholder="Enter Room Name" name="roomname" type="text">
-                        </div>
-                        <button type="submit" class="btn btn-lg btn-success btn-block">Create Room</button>
-                      </fieldset>
+                        <fieldset>
+                            <div class="form-group">
+                                <div>
+                                    <input class="form-control" placeholder="Enter Room Name" name="roomname"
+                                           type="text">
+                                </div>
+                                <div>
+                                    <input type="checkbox" name="enableAdmin" id="enableAdmin" checked>
+                                    <label for="enableAdmin">Enable a room admin</label>
+                                </div>
+                                <div>
+                                    <input type="checkbox" name="enableInvites" id="enableInvites" checked>
+                                    <label for="enableInvites">Enable direct invite links</label>
+                                </div>
+                                <div>
+                                    <strong>When the room admin leaves:</strong>
+                                </div>
+                                <input type="radio" id="closeRoom" name="leaveOption" value="closeRoom">
+                                <label for="closeRoom">Close the chatroom</label><br>
+                                <input type="radio" id="passAdmin" name="leaveOption" value="passAdmin">
+                                <label for="passAdmin">Give room admin to next oldest member</label><br>
+                                <input type="radio" id="disableAdmin" name="leaveOption" value="disableAdmin">
+                                <label for="disableAdmin">Disable admin for the chatroom</label>
+                            </div>
+                            <button type="submit" class="btn btn-lg btn-success btn-block">Create Room</button>
+
+                        </fieldset>
                     </form>
-                  </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 </body>
 </html>

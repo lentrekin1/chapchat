@@ -2,6 +2,8 @@
 <html lang="en">
 
 <head lang="en">
+    <title>Admin - ChapChats</title>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <script src="//code.jquery.com/jquery-1.11.1.js"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.min.js"></script>
     <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
@@ -176,56 +178,74 @@
     function changePass() {
         socket.emit('change admin pass', {data: {pass: $.cookie("pass")}});
     }
+
+    function logOut() {
+        window.location.href = '/logout';
+    }
+
     </script>
     <style type="text/css">
         input[type="file"] {
            display: none;
         }
+
     </style>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 </head>
 
 <body>
-    <br>
-    <div class="panel panel-primary col-md-11">
-        <div class="panel-body">There are {{ totalnum }} people in {{ rooms|length }} rooms</div>
-    </div>
-    <div class="row">
-      <div id="chatbox">
+<br>
+<div class="panel panel-primary col-md-11">
+    <div class="panel-body">There are {{ totalnum }} people in {{ rooms|length }} rooms</div>
+</div>
+<div class="row">
+    <div id="chatbox">
         <div class="panel panel-info col-md-11">
-          <div class="panel-heading">
-            <strong id="room">Not connected to a room</strong>
-          </div>
-          <div class="panel-body fixed-panel" style="max-height: 10;overflow-y: scroll;" id="scrollbox">
-            <ul class="media-list">
-                <li class="media"><div class="media-body"><div class="media"><div class="media-body">Enter a room to see messages<br/></div></div></div></li>
-            </ul>
-          </div>
-          <div class="panel-footer">
-              <input type="text" class="form-control" placeholder="Enter Message" id="messageText" autofocus/>
-              <label for="photo" class="btn btn-info" id="photowrap">
-                <input type="file" id="photo" accept=".jpg, .jpeg, .png" onchange="previewImg(this)">
-                  Upload an image
-              </label>
-            <button class="btn btn-info" type="button" id="sendMessage">SEND <span class="glyphicon glyphicon-send"></span></button>
-            <img id="preview" src="#" width="100" height="100" style="display: none;">
-            <button id="remimg" class="btn btn-info" onclick="previewImg(this)" style="display: none;">Remove Image</button>
-          </div>
+            <div class="panel-heading">
+                <strong id="room">Not connected to a room</strong>
+            </div>
+            <div class="panel-body fixed-panel" style="max-height: 10;overflow-y: scroll;" id="scrollbox">
+                <ul class="media-list">
+                    <li class="media">
+                        <div class="media-body">
+                            <div class="media">
+                                <div class="media-body">Enter a room to see messages<br/></div>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+            <div class="panel-footer">
+                <input type="text" class="form-control" placeholder="Enter Message" id="messageText" autofocus/>
+                <label for="photo" class="btn btn-info" id="photowrap">
+                    <input type="file" id="photo" accept=".jpg, .jpeg, .png" onchange="previewImg(this)">
+                    Upload an image
+                </label>
+                <button class="btn btn-info" type="button" id="sendMessage">SEND <span
+                        class="glyphicon glyphicon-send"></span></button>
+                <img id="preview" src="#" width="100" height="100" style="display: none;">
+                <button id="remimg" class="btn btn-info" onclick="previewImg(this)" style="display: none;">Remove
+                    Image
+                </button>
+            </div>
         </div>
-      </div>
     </div>
-    <button type="button" class="btn btn-info" onclick="connect()" style="margin:5px;">Join room</button>
-    <button type="button" class="btn btn-info" onclick="dc()" style="margin:5px;">Leave room</button>
-    <button type="button" class="btn btn-info" onclick="changePass()" style="margin:5px;">Change admin password</button>
-    <strong id="confirm email"></strong>
-    {% for room in rooms %}
-    <button type="button" class="collapsible" id="{{ room.name }}" onclick="displayUsers(this.id);">{{ room.name }}: {{ room.people|length }} members</button>
-    <div class="content">
-        {% for person in room.people %}
-        <p>{{ person }}</p>
-        {% endfor %}
-    </div>
+</div>
+<button type="button" class="btn btn-info" onclick="connect()" style="margin:5px;">Join room</button>
+<button type="button" class="btn btn-info" onclick="dc()" style="margin:5px;">Leave room</button>
+<button type="button" class="btn btn-info" onclick="changePass()" style="margin:5px;">Change admin password</button>
+<button type="button" class="btn btn-info" onclick="logOut()" style="margin:5px;">Logout</button>
+<strong id="confirm email"></strong>
+{% for room in rooms %}
+<button type="button" class="collapsible" id="{{ room.name }}" onclick="displayUsers(this.id);">{{ room.name }}: {{
+    room.people|length }} members
+</button>
+<div class="content">
+    {% for person in room.people %}
+    <p>{{ person }}</p>
     {% endfor %}
+</div>
+{% endfor %}
 
 </body>
 

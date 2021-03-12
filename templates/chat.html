@@ -2,14 +2,19 @@
 <html>
 
 <head lang="en">
-  <meta charset="UTF-8">
-  <title></title>
-  <script src="//code.jquery.com/jquery-1.11.1.js"></script>
-  <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.min.js"></script>
-  <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
-  <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-timeago/1.4.0/jquery.timeago.min.js"></script>
-  <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.6/socket.io.min.js"></script>
-  <script>
+    <meta charset="UTF-8">
+    <title>{{ roomName }} - ChapChats</title>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <script src="//code.jquery.com/jquery-1.11.1.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-timeago/1.4.0/jquery.timeago.min.js"></script>
+    <script src="//cdn.jsdelivr.net/npm/@popperjs/core@2.9.1/dist/umd/popper.min.js"></script>
+    <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.6/socket.io.min.js"></script>
+    <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <script>
     window.onbeforeunload = function () {
       var old;
       if (typeof $.cookie("old-nickname") !== 'undefined') {
@@ -38,11 +43,10 @@
     });
 
     socket.on('disconnect', function(){
-      console.log("chat disconnected");
+      console.log('chat disconnected');
     });
 
     socket.on("message", function (message) {
-      console.log('cdd');
       refreshMessages(message);
     });
 
@@ -163,10 +167,25 @@
         }, 3000);
       }
     }
-  </script>
-  <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
-  <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
-  <style type="text/css">
+
+     $(function(){
+        $(".dropdown-menu li a").click(function(){
+          var length = document.getElementById('userDropdown').offsetWidth;
+          document.getElementById('userDropdown').innerHTML = $(this).text()
+          document.getElementById('userDropdown').style.width = length + 'px';
+        });
+     });
+
+     function kickUser() {
+        if (document.getElementById('userDropdown').innerHTML !== 'Select a user') {
+        socket.emit('kick user', {data: {kick: document.getElementById('userDropdown').innerHTML, user: $.cookie("realtime-chat-nickname"), room: channel, key: $.cookie("room-key")}});
+        }
+        document.getElementById('userDropdown').innerHTML = 'Select a user'
+     }
+
+
+    </script>
+    <style type="text/css">
     .fixed-panel {
       min-height: 500px;
       max-height: 500px;
@@ -177,45 +196,68 @@
     }
 
     input[type="file"] {
-    display: none;
+      display: none;
     }
-  </style>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
+    @media (max-width: 420px) {
+      .btn-sm {
+        padding:4px;
+      }
+    }
+
+
+    </style>
 </head>
 
 <body>
-  <div class="container">
+<div class="container">
     <div class="row">
-
-      <h3 class="text-center">Chap Chat 🤡</h3>
-      <br/><br/>
-
-      <div id="chatbox">
-        <div class="panel panel-info">
-          <div class="panel-heading">
-            <strong id="room"></strong>
-            <span style="display:inline-block; width: 5px;"></span>
-            <button class="btn btn-info btn-sm" id="share" onclick="shareLink()">Share Invite Link</button>
-          </div>
-          <div class="panel-body fixed-panel" style="max-height: 10;overflow-y: scroll;" id="scrollbox">
-            <ul class="media-list">
-            </ul>
-          </div>
-          <div class="panel-footer">
-              <input type="text" class="form-control" placeholder="Enter Message" id="messageText" autofocus/>
-              <label for="photo" class="btn btn-info" id="photowrap">
-                <input type="file" id="photo" accept=".jpg, .jpeg, .png" onchange="previewImg(this)">
-                  Upload an image
-              </label>
-            <button class="btn btn-info" type="button" id="sendMessage">SEND <span class="glyphicon glyphicon-send"></span></button>
-            <img id="preview" src="#" width="100" height="100" style="display: none;">
-            <button id="remimg" class="btn btn-info" onclick="previewImg(this)" style="display: none;">Remove Image</button>
-          </div>
+        <h3 class="text-center">ChapChats</h3>
+        <div id="chatbox">
+            <div class="panel panel-info">
+                <div class="panel-heading">
+                    <strong id="room"></strong>
+                    <span style="display:inline-block; width: 5px;"></span>
+                    <div>
+                        <button class="btn btn-info btn-sm" id="share" onclick="shareLink()"
+                                style="display:{{ invites }}">Share Invite Link
+                        </button>
+                        <button class="btn btn-sm btn-danger" name="leave" onclick="leaveRoom()">Leave Room</button>
+                        <div class="dropdown pull-right" style="display:{{ roomLeader }};" id="kick screen">
+                            <button class="btn btn-info btn-sm dropdown-toggle" type="button" id="userDropdown"
+                                    data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Select a user
+                            </button>
+                            <ul class="dropdown-menu dropdown-primary" style="height:200px;overflow-y:auto;">
+                                {% for person in people %}
+                                <li><a class="dropdown-item" name="{{ person }}" style="word-wrap: break-word;">{{
+                                    person }}</a></li>
+                                {% endfor %}
+                            </ul>
+                            <button class="btn btn-primary btn-sm" id="kickUser" onclick="kickUser()">Kick User</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="panel-body fixed-panel" style="max-height: 10;overflow-y: scroll;" id="scrollbox">
+                    <ul class="media-list">
+                    </ul>
+                </div>
+                <div class="panel-footer">
+                    <input type="text" class="form-control" placeholder="Enter Message" id="messageText" autofocus/>
+                    <label for="photo" class="btn btn-info" id="photowrap">
+                        <input type="file" id="photo" accept=".jpg, .jpeg, .png" onchange="previewImg(this)">
+                        Upload an image
+                    </label>
+                    <button class="btn btn-info" type="button" id="sendMessage" style="margin:5px;">SEND <span
+                            class="glyphicon glyphicon-send"></span></button>
+                    <img id="preview" src="#" width="100" height="100" style="display: none;margin:5px;">
+                    <button id="remimg" class="btn btn-info" onclick="previewImg(this)"
+                            style="display: none;margin:5px;">Remove Image
+                    </button>
+                </div>
+            </div>
         </div>
-      </div>
-      <button type="button" class="btn btn-lg btn-danger btn-block" name="leave" onclick="leaveRoom()" style="margin-bottom:30px;">Leave Room</button>
     </div>
-  </div>
+</div>
 </body>
 
 </html>

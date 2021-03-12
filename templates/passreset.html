@@ -2,63 +2,72 @@
 <html>
 
 <head lang="en">
-  <meta charset="UTF-8">
-  <title></title>
-  <script src="//code.jquery.com/jquery-1.11.1.js"></script>
-  <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
-  <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.min.js"></script>
-  <script>
+    <meta charset="UTF-8">
+    <title>Password Reset - ChapChats</title>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <script src="//code.jquery.com/jquery-1.11.1.js"></script>
+    <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.min.js"></script>
+    <script>
     function setName() {
       //$.cookie("realtime-chat-nickname", $("#nickname").val());
       document.cookie = "realtime-chat-nickname=" + $("#nickname").val() + ";path=/";
     }
-  </script>
-  <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
-  <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static',filename='styles/stylesheet.css') }}" type="text/css">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
+    </script>
+    <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static',filename='styles/stylesheet.css') }}" type="text/css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 </head>
 
 <body>
 
-  <div class="container" style="min-height:100% width:80%">
-	{% with messages = get_flashed_messages() %}
-	  {% if messages %}
-	    {% for message in messages %}
-		  <div class="alert alert-warning alert-dismissible" role="alert">
-		  <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button>
-			{{message}}
-		  </div>
-		{% endfor %}
-	  {% endif %}
-	{% endwith %}
-
-	{% block body %}{% endblock %}
-	</div>
-
-  <div class="container" style="padding-top: 50px">
-    <div class="row">
-      <div class="col-md-auto">
-        <div class="login-panel panel panel-default">
-          <div class="panel-heading">
-            <h3 class="panel-title">Change admin password</h3>
-          </div>
-          <div class="panel-body">
-            <form role="form" name="frm-login" method="post">
-              <fieldset>
-                <div class="form-group">
-                    <input class="form-control" placeholder="Enter New Admin Password" name="newpass" id="newpass" type="password">
-                    <br>
-                    <input class="form-control" placeholder="Confirm New Admin Password" name="confirmpass" id="confirmpass" type="password">
-                </div>
-                <button type="submit" class="btn btn-lg btn-success" name="main">Change Admin Password</button>
-              </fieldset>
-            </form>
-          </div>
-        </div>
-      </div>
+<div class="container" style="min-height:100% width:80%">
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-warning alert-dismissible" role="alert">
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span>
+        </button>
+        {{message}}
     </div>
-  </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    {% block body %}{% endblock %}
+</div>
+
+<div class="container" style="padding-top: 50px">
+    <div class="row">
+        <div class="col-md-auto">
+            <div class="login-panel panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Change admin password</h3>
+                </div>
+                <div class="panel-body">
+                    <form role="form" name="frm-login" method="post">
+                        <fieldset>
+                            <div class="form-group">
+                                <input class="form-control" placeholder="Enter New Admin Password" name="newpass"
+                                       id="newpass" type="password">
+                                <br>
+                                <input class="form-control" placeholder="Confirm New Admin Password" name="confirmpass"
+                                       id="confirmpass" type="password">
+                            </div>
+                            <button type="submit" class="btn btn-lg btn-success" name="main">Change Admin Password
+                            </button>
+                            <button type="button" class="btn btn-lg btn-info" onclick="location.href='/admin'">Return to
+                                admin login
+                            </button>
+                        </fieldset>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
 
 </html>

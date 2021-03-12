@@ -2,6 +2,8 @@
 <html>
 
 <head>
+    <title>Admin Login - ChapChats</title>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
@@ -12,46 +14,51 @@
         function setAdmin() {
             document.cookie = 'pass=' + document.getElementById('pass').value + ';expires=' + date.toUTCString() + '; path=/';
         }
+
     </script>
 </head>
 
 <body>
-    <div class="container" style="min-height:100% width:80%">
-	{% with messages = get_flashed_messages() %}
-	  {% if messages %}
-	    {% for message in messages %}
-		  <div class="alert alert-warning alert-dismissible" role="alert">
-		  <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button>
-			{{message}}
-		  </div>
-		{% endfor %}
-	  {% endif %}
-	{% endwith %}
-
-	{% block body %}{% endblock %}
-	</div>
-
-  <div class="container" style="padding-top: 50px">
-    <div class="row">
-      <div class="col-md-auto">
-        <div class="login-panel panel panel-default">
-          <div class="panel-heading">
-            <h3 class="panel-title">Enter admin password</h3>
-          </div>
-          <div class="panel-body">
-            <form role="form" name="frm-login" method="post">
-              <fieldset>
-                <div class="form-group">
-                  <input class="form-control" placeholder="Enter Password" name="pass" id="pass" type="password" value="">
-                </div>
-                <button type="submit" class="btn btn-lg btn-success" name="main" onclick="setAdmin()">Login</button>
-              </fieldset>
-            </form>
-          </div>
-        </div>
-      </div>
+<div class="container" style="min-height:100% width:80%">
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-warning alert-dismissible" role="alert">
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span>
+        </button>
+        {{message}}
     </div>
-  </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    {% block body %}{% endblock %}
+</div>
+
+<div class="container" style="padding-top: 50px">
+    <div class="row">
+        <div class="col-md-auto">
+            <div class="login-panel panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Enter admin password</h3>
+                </div>
+                <div class="panel-body">
+                    <form role="form" name="frm-login" method="post">
+                        <fieldset>
+                            <div class="form-group">
+                                <input class="form-control" placeholder="Enter Password" name="pass" id="pass"
+                                       type="password" value="">
+                            </div>
+                            <button type="submit" class="btn btn-lg btn-success" name="main" onclick="setAdmin()">
+                                Login
+                            </button>
+                        </fieldset>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
 
 </html>
