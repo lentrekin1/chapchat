@@ -16,30 +16,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <script>
     window.onbeforeunload = function () {
-      var old;
+      /*var old;
       if (typeof $.cookie("old-nickname") !== 'undefined') {
         old = $.cookie("old-nickname")
         document.cookie = 'old-nickname=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
       } else {
         old = $.cookie("realtime-chat-nickname")
-      }
-      socket.emit('leave', {data: {room: channel, user: old}})
+      }*/
+      socket.emit('leave', {data: {room: channel}})
+      location.href = '/login'
     }
 
     var roomsDir = '/rooms/';
     var inviteDir = '/invite/';
     var channel = window.location.href.split('/').slice(4).join('/');
-    var socket = io.connect(window.location.protocol + '//' + document.domain + ':' + location.port);
+    var socket = io.connect(window.location.protocol + '//' + document.domain);
 
     window.onload = function(){
-      document.getElementById('room').innerHTML = channel;
-      if (channel === 'mainchat') {
-        document.getElementById('photowrap').style.display = 'none';
-      }
+      //document.getElementById('room').innerHTML = channel;
+      console.log({{ photos }});
+      document.getElementById('photowrap').style.display = "{{ photos }}";
     }
 
     socket.on('connect', function () {
-      socket.emit('set connection', { data: {message: 'I\'m connected!', room: channel, user: $.cookie("realtime-chat-nickname")} });
+      socket.emit('set connection', { data: {message: 'I\'m connected!'} });
     });
 
     socket.on('disconnect', function(){
@@ -48,6 +48,18 @@
 
     socket.on("message", function (message) {
       refreshMessages(message);
+    });
+
+    socket.on("update", function (message) {
+        if (message.data.type === 'removal') {
+            if (document.getElementById('userDropdown').innerHTML.trim() === message.data.kick) {
+                document.getElementById('userDropdown').innerHTML = 'Select a user'
+            }
+            document.getElementById(message.data.name).parentNode.parentNode.removeChild(document.getElementById(message.data.name).parentNode)
+        }
+        if (message.data.type === 'add') {
+            $("#dropdownMain").append('<li><a class="dropdown-item" name="' + message.data.name + '" id="' + message.data.name + '" style="word-wrap: break-word;">' + message.data.name + '</a></li>');
+        }
     });
 
     function refreshMessages(message) {
@@ -82,9 +94,9 @@
 
     $(function () {
 
-      if (typeof $.cookie("realtime-chat-nickname") === 'undefined') {
+      /*if (typeof $.cookie("realtime-chat-nickname") === 'undefined') {
         window.location = "/login"
-      } else {
+      } else {*/
         $("#sendMessage").on("click", function () {
           sendMessage()
         });
@@ -94,22 +106,22 @@
             sendMessage();
           }
         });
-      }
+      //}
 
       function sendMessage() {
         $container = $('.media-list');
         $container[0].scrollTop = $container[0].scrollHeight;
-        var user = $.cookie("realtime-chat-nickname");
+        //var user = $.cookie("realtime-chat-nickname");
         var photo = document.getElementById('photo').files[0];
         if (typeof photo === "undefined") {
           var message = $("#messageText").val();
-          socket.emit('message', { data: { message: message, user: user, room: channel} });
+          socket.emit('message', { data: { message: message} });
           $("#messageText").val("");
         } else {
           var reader = new FileReader();
           reader.onload = function(evt){
               var msg = evt.target.result;
-              socket.emit('photo', { data: { photo: msg, user: user, room: channel} });
+              socket.emit('photo', { data: { photo: msg} });
           };
           reader.readAsDataURL(photo);
           previewImg();
@@ -119,9 +131,9 @@
     })
 
     function leaveRoom() {
-      $.cookie("old-nickname", $.cookie("realtime-chat-nickname"));
-      document.cookie = 'realtime-chat-nickname=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-      window.location.reload()
+      //$.cookie("old-nickname", $.cookie("realtime-chat-nickname"));
+      //document.cookie = 'realtime-chat-nickname=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      location.href = '/login'
     }
 
     function previewImg() {
@@ -170,15 +182,17 @@
 
      $(function(){
         $(".dropdown-menu li a").click(function(){
+            console.log($(this).text());
           var length = document.getElementById('userDropdown').offsetWidth;
-          document.getElementById('userDropdown').innerHTML = $(this).text()
+          document.getElementById('userDropdown').innerHTML = $(this).text();
+
           document.getElementById('userDropdown').style.width = length + 'px';
         });
      });
 
      function kickUser() {
-        if (document.getElementById('userDropdown').innerHTML !== 'Select a user') {
-        socket.emit('kick user', {data: {kick: document.getElementById('userDropdown').innerHTML, user: $.cookie("realtime-chat-nickname"), room: channel, key: $.cookie("room-key")}});
+        if (document.getElementById('userDropdown').innerHTML.trim() !== 'Select a user') {
+        socket.emit('kick user', {data: {kick: document.getElementById('userDropdown').innerHTML}});
         }
         document.getElementById('userDropdown').innerHTML = 'Select a user'
      }
@@ -216,7 +230,7 @@
         <div id="chatbox">
             <div class="panel panel-info">
                 <div class="panel-heading">
-                    <strong id="room"></strong>
+                    <strong id="room">{{ roomName }}</strong>
                     <span style="display:inline-block; width: 5px;"></span>
                     <div>
                         <button class="btn btn-info btn-sm" id="share" onclick="shareLink()"
@@ -227,9 +241,9 @@
                             <button class="btn btn-info btn-sm dropdown-toggle" type="button" id="userDropdown"
                                     data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Select a user
                             </button>
-                            <ul class="dropdown-menu dropdown-primary" style="height:200px;overflow-y:auto;">
+                            <ul class="dropdown-menu dropdown-primary" id="dropdownMain" style="height:200px;overflow-y:auto;">
                                 {% for person in people %}
-                                <li><a class="dropdown-item" name="{{ person }}" style="word-wrap: break-word;">{{
+                                <li><a class="dropdown-item" name="{{ person }}" id="{{ person }}" style="word-wrap: break-word;">{{
                                     person }}</a></li>
                                 {% endfor %}
                             </ul>
@@ -243,7 +257,7 @@
                 </div>
                 <div class="panel-footer">
                     <input type="text" class="form-control" placeholder="Enter Message" id="messageText" autofocus/>
-                    <label for="photo" class="btn btn-info" id="photowrap">
+                    <label for="photo" class="btn btn-info" id="photowrap" style="display: {{ photos }}">
                         <input type="file" id="photo" accept=".jpg, .jpeg, .png" onchange="previewImg(this)">
                         Upload an image
                     </label>
