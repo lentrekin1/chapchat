@@ -4,7 +4,7 @@
 <head lang="en">
     <meta charset="UTF-8">
     <title>Login - ChapChats</title>
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link href="{{ url_for('static', filename='favicon.ico') }}" rel="shortcut icon">
     <script src="//code.jquery.com/jquery-1.11.1.js"></script>
     <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.min.js"></script>
@@ -14,11 +14,13 @@
       //document.cookie = "realtime-chat-nickname=" + $("#nickname").val() + ";path=/";
     //}
 
+
+
     </script>
     <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static',filename='styles/stylesheet.css') }}" type="text/css">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link href="{{ url_for('static',filename='styles/stylesheet.css') }}" rel="stylesheet" type="text/css">
+    <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
 </head>
 
 <body>
@@ -28,7 +30,7 @@
     {% if messages %}
     {% for message in messages %}
     <div class="alert alert-warning alert-dismissible" role="alert">
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span>
+        <button aria-label="Close" class="close" data-dismiss="alert" type="button"><span aria-hidden="true">×</span>
         </button>
         {{message}}
     </div>
@@ -47,25 +49,26 @@
                     <h3 class="panel-title">Choose a nickname to enter chat</h3>
                 </div>
                 <div class="panel-body">
-                    <form role="form" name="frm-login" method="post">
+                    <form method="post" name="frm-login" role="form">
                         <fieldset>
                             <div class="form-group">
-                                <input class="form-control" placeholder="Enter Nickname" name="nickname" id="nickname"
+                                <input class="form-control" id="nickname" name="nickname" placeholder="Enter Nickname"
                                        type="text">
                             </div>
-                            <button type="submit" class="btn btn-lg btn-success" name="main">Enter
+                            <button class="btn btn-lg btn-success" name="main" type="submit">Enter
                                 Main Chat
                             </button>
                             <div class="form-group">
-                                <input class="form-control" placeholder="Enter Room Code to Join Specific Room"
-                                       name="room" id="room" type="text" style="margin-top:10px;">
+                                <input class="form-control" id="room"
+                                       name="room" placeholder="Enter Room Code to Join Specific Room"
+                                       style="margin-top:10px;" type="text">
                             </div>
-                            <button type="submit" class="btn btn-lg btn-primary" name="specific">
+                            <button class="btn btn-lg btn-primary" name="specific" type="submit">
                                 Join Specific Room
                             </button>
                             <br>
-                            <button type="submit" class="btn btn-lg btn-primary" name="newroom"
-                                    style="margin-top:10px;">Create New Room
+                            <button class="btn btn-lg btn-primary" name="newroom" style="margin-top:10px;"
+                                    type="submit">Create New Room
                             </button>
                         </fieldset>
                     </form>

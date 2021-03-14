@@ -3,10 +3,10 @@
 
 <head lang="en">
     <title>New Room - ChapChats</title>
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link href="{{ url_for('static', filename='favicon.ico') }}" rel="shortcut icon">
     <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
 </head>
 
 <body>
@@ -16,7 +16,7 @@
     {% if messages %}
     {% for message in messages %}
     <div class="alert alert-warning alert-dismissible" role="alert">
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span>
+        <button aria-label="Close" class="close" data-dismiss="alert" type="button"><span aria-hidden="true">×</span>
         </button>
         {{message}}
     </div>
@@ -35,36 +35,35 @@
                     <h3 class="panel-title">Create a New Room</h3>
                 </div>
                 <div class="panel-body">
-                    <form role="form" id="room-creation" method="post">
+                    <form id="room-creation" method="post" role="form">
                         <fieldset>
                             <div class="form-group">
                                 <div>
-                                    <input class="form-control" placeholder="Enter Room Name" name="roomname"
+                                    <input class="form-control" name="roomname" placeholder="Enter Room Name"
                                            type="text">
                                 </div>
                                 <div>
-                                    <input type="checkbox" name="enableAdmin" id="enableAdmin" checked>
+                                    <input checked id="enableAdmin" name="enableAdmin" type="checkbox">
                                     <label for="enableAdmin">Enable a room admin</label>
                                 </div>
                                 <div>
-                                    <input type="checkbox" name="enableInvites" id="enableInvites" checked>
+                                    <input checked id="enableInvites" name="enableInvites" type="checkbox">
                                     <label for="enableInvites">Enable direct invite links</label>
                                 </div>
                                 <div>
-                                    <input type="checkbox" name="enablePhotos" id="enablePhotos" checked>
+                                    <input checked id="enablePhotos" name="enablePhotos" type="checkbox">
                                     <label for="enablePhotos">Enable photos</label>
                                 </div>
                                 <div>
-                                    <strong>When the room admin leaves:</strong>
+                                    <input checked id="addLeaders" name="addLeaders" type="checkbox">
+                                    <label for="addLeaders">Enable adding other room leaders</label>
                                 </div>
-                                <input type="radio" id="closeRoom" name="leaveOption" value="closeRoom">
-                                <label for="closeRoom">Close the chatroom</label><br>
-                                <input type="radio" id="passAdmin" name="leaveOption" value="passAdmin">
-                                <label for="passAdmin">Give room admin to next oldest member</label><br>
-                                <input type="radio" id="disableAdmin" name="leaveOption" value="disableAdmin">
-                                <label for="disableAdmin">Disable admin for the chatroom</label>
+                                <div>
+                                    <input checked id="subAddLeaders" name="subAddLeaders" type="checkbox">
+                                    <label for="subAddLeaders">New leaders can also add leaders</label>
+                                </div>
                             </div>
-                            <button type="submit" class="btn btn-lg btn-success btn-block">Create Room</button>
+                            <button class="btn btn-lg btn-success btn-block" type="submit">Create Room</button>
 
                         </fieldset>
                     </form>

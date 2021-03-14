@@ -1,13 +1,14 @@
 -chap colored theme
 -more visually appealing
+
 -send pics - DONE
     -prob disable in gen chat - DONE
 -save/show old chats when person enters room - DONE
 -time stamps on msgs + join/leave - DONE
--room creator can kick/invite people
-    -once creator leaves oldest member becomes room admin
+-room creator can kick/invite people - DONE
 -direct invite links - DONE
 -add change admin pw function - DONE
--admin panel should auto update rooms/members - reload not required
 -add logout button for admin - DONE
--actually save rooms in rooms.csv
+-actually save rooms in rooms.csv - DONE
+
+-admin panel should auto update rooms/members - reload not required

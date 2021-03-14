@@ -4,7 +4,7 @@
 <head lang="en">
     <meta charset="UTF-8">
     <title>{{ roomName }} - ChapChats</title>
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link href="{{ url_for('static', filename='favicon.ico') }}" rel="shortcut icon">
     <script src="//code.jquery.com/jquery-1.11.1.js"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.min.js"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-timeago/1.4.0/jquery.timeago.min.js"></script>
@@ -13,16 +13,10 @@
     <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.6/socket.io.min.js"></script>
     <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link href="{{ url_for('static',filename='styles/stylesheet.css') }}" rel="stylesheet" type="text/css">
+    <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
     <script>
     window.onbeforeunload = function () {
-      /*var old;
-      if (typeof $.cookie("old-nickname") !== 'undefined') {
-        old = $.cookie("old-nickname")
-        document.cookie = 'old-nickname=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-      } else {
-        old = $.cookie("realtime-chat-nickname")
-      }*/
       socket.emit('leave', {data: {room: channel}})
       location.href = '/login'
     }
@@ -34,8 +28,14 @@
 
     window.onload = function(){
       //document.getElementById('room').innerHTML = channel;
-      console.log({{ photos }});
+      //console.log({{ photos }});
       document.getElementById('photowrap').style.display = "{{ photos }}";
+
+      $("#dropdownMain li a").click(function(){
+          //var length = document.getElementById('userDropdown').offsetWidth;
+          document.getElementById('userDropdown').innerHTML = $(this).text();
+          //document.getElementById('userDropdown').style.width = length + 'px';
+        });
     }
 
     socket.on('connect', function () {
@@ -47,20 +47,53 @@
     });
 
     socket.on("message", function (message) {
+        if ('update' in message.data) {
+            console.log(message);
+            if (message.data.update === 'addition') {
+                $("#dropdownMain").append('<li><a class="dropdown-item" name="' + message.data.name + '" id="' + message.data.name + '" style="word-wrap: break-word;">' + message.data.name + '</a></li>');
+                $("#dropdownMain li a").click(function(){
+                  //var length = document.getElementById('userDropdown').offsetWidth;
+                  document.getElementById('userDropdown').innerHTML = $(this).text();
+                  //document.getElementById('userDropdown').style.width = length + 'px';
+                });
+            }
+            if (message.data.update === 'removal') {
+                if (document.getElementById('userDropdown').innerHTML.trim() === message.data.kick) {
+                    document.getElementById('userDropdown').innerHTML = 'Select a user'
+                }
+                if (document.getElementById(message.data.name)) {
+                    document.getElementById(message.data.name).parentNode.parentNode.removeChild(document.getElementById(message.data.name).parentNode)
+                }
+            }
+
+        }
       refreshMessages(message);
     });
 
-    socket.on("update", function (message) {
-        if (message.data.type === 'removal') {
-            if (document.getElementById('userDropdown').innerHTML.trim() === message.data.kick) {
-                document.getElementById('userDropdown').innerHTML = 'Select a user'
-            }
-            document.getElementById(message.data.name).parentNode.parentNode.removeChild(document.getElementById(message.data.name).parentNode)
-        }
-        if (message.data.type === 'add') {
-            $("#dropdownMain").append('<li><a class="dropdown-item" name="' + message.data.name + '" id="' + message.data.name + '" style="word-wrap: break-word;">' + message.data.name + '</a></li>');
-        }
+    socket.on('leader link', function (message) {
+        try{
+        navigator.share({
+          title: 'Share this link to add leaders to this chatroom',
+          text: 'Become a leader in this chatroom now!',
+          url: message.data.link
+        })
+      } catch(err) {
+        var tmp = document.createElement('input');
+        document.body.appendChild(tmp);
+        tmp.value = message.data.link
+        tmp.select();
+        document.execCommand("copy", false);
+        tmp.remove();
+        document.getElementById('share').innerHTML = '✓ Leader Link Copied';
+        setTimeout(function(){
+            document.getElementById('share').innerHTML = 'Invite Leaders';
+        }, 3000);
+      }
     });
+
+    function addLeaders() {
+        socket.emit('get leader link');
+    }
 
     function refreshMessages(message) {
       var $panel = $('#scrollbox');
@@ -180,15 +213,15 @@
       }
     }
 
-     $(function(){
-        $(".dropdown-menu li a").click(function(){
+     /*$(function(){
+        $("#dropdownMain li").click(function(){
             console.log($(this).text());
           var length = document.getElementById('userDropdown').offsetWidth;
           document.getElementById('userDropdown').innerHTML = $(this).text();
-
+            console.log($(this).text());
           document.getElementById('userDropdown').style.width = length + 'px';
         });
-     });
+     });*/
 
      function kickUser() {
         if (document.getElementById('userDropdown').innerHTML.trim() !== 'Select a user') {
@@ -234,37 +267,45 @@
                     <span style="display:inline-block; width: 5px;"></span>
                     <div>
                         <button class="btn btn-info btn-sm" id="share" onclick="shareLink()"
-                                style="display:{{ invites }}">Share Invite Link
+                                style="display:{{ invites }}">Share Invite
                         </button>
-                        <button class="btn btn-sm btn-danger" name="leave" onclick="leaveRoom()">Leave Room</button>
-                        <div class="dropdown pull-right" style="display:{{ roomLeader }};" id="kick screen">
-                            <button class="btn btn-info btn-sm dropdown-toggle" type="button" id="userDropdown"
-                                    data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Select a user
+                        <button class="btn btn-info btn-sm" id="addLead" onclick="addLeaders()"
+                                style="display:{{ otherLeaders }}">Add Leaders
+                        </button>
+                        <button class="btn btn-sm btn-danger" id="leave" name="leave" onclick="leaveRoom()">Leave
+                        </button>
+                        <div class="dropdown pull-right form-row justify-content-center"
+                             id="kick screen" style="display:{{ roomLeader }};">
+                            <button aria-expanded="false" aria-haspopup="true"
+                                    class="btn btn-info btn-sm dropdown-toggle"
+                                    data-toggle="dropdown" id="userDropdown" type="button">Select user
                             </button>
-                            <ul class="dropdown-menu dropdown-primary" id="dropdownMain" style="height:200px;overflow-y:auto;">
+                            <ul class="dropdown-menu dropdown-primary" id="dropdownMain"
+                                style="height:200px;overflow-y:auto;">
                                 {% for person in people %}
-                                <li><a class="dropdown-item" name="{{ person }}" id="{{ person }}" style="word-wrap: break-word;">{{
+                                <li><a class="dropdown-item" id="{{ person }}" name="{{ person }}"
+                                       style="word-wrap: break-word;">{{
                                     person }}</a></li>
                                 {% endfor %}
                             </ul>
-                            <button class="btn btn-primary btn-sm" id="kickUser" onclick="kickUser()">Kick User</button>
+                            <button class="btn btn-primary btn-sm" id="kickUser" onclick="kickUser()">Kick</button>
                         </div>
                     </div>
                 </div>
-                <div class="panel-body fixed-panel" style="max-height: 10;overflow-y: scroll;" id="scrollbox">
+                <div class="panel-body fixed-panel" id="scrollbox" style="max-height: 10;overflow-y: scroll;">
                     <ul class="media-list">
                     </ul>
                 </div>
                 <div class="panel-footer">
-                    <input type="text" class="form-control" placeholder="Enter Message" id="messageText" autofocus/>
-                    <label for="photo" class="btn btn-info" id="photowrap" style="display: {{ photos }}">
-                        <input type="file" id="photo" accept=".jpg, .jpeg, .png" onchange="previewImg(this)">
+                    <input autofocus class="form-control" id="messageText" placeholder="Enter Message" type="text"/>
+                    <label class="btn btn-info" for="photo" id="photowrap" style="display: {{ photos }}">
+                        <input accept=".jpg, .jpeg, .png" id="photo" onchange="previewImg(this)" type="file">
                         Upload an image
                     </label>
-                    <button class="btn btn-info" type="button" id="sendMessage" style="margin:5px;">SEND <span
+                    <button class="btn btn-info" id="sendMessage" style="margin:5px;" type="button">SEND <span
                             class="glyphicon glyphicon-send"></span></button>
-                    <img id="preview" src="#" width="100" height="100" style="display: none;margin:5px;">
-                    <button id="remimg" class="btn btn-info" onclick="previewImg(this)"
+                    <img height="100" id="preview" src="#" style="display: none;margin:5px;" width="100">
+                    <button class="btn btn-info" id="remimg" onclick="previewImg(this)"
                             style="display: none;margin:5px;">Remove Image
                     </button>
                 </div>

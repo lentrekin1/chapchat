@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Become a Room Leader - ChapChats</title>
+    <link href="{{ url_for('static', filename='favicon.ico') }}" rel="shortcut icon">
+    <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
+</head>
+
+<body>
+<h1>You have been added as a leader for the chatroom "{{ roomName }}"</h1>
+<p>This only applies when you access this chatroom from this device</p>
+<p>{{ 'This URL is now invalid' if invalid else '' }}</p>
+<a href="/login">Go to login</a>
+</body>
+</html>

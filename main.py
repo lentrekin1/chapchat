@@ -1,10 +1,20 @@
-from flask import Flask, render_template, session, request, redirect, flash, make_response
-from flask_socketio import SocketIO, emit, join_room, leave_room
+import base64
+import csv
+import hashlib
+import hmac
+import os
+import pickle
+import random
+import string
+import time
+from datetime import datetime
+
+from flask import Flask, render_template, session, request, redirect, flash
 from flask_login import current_user, login_user, LoginManager, UserMixin, logout_user
 from flask_mail import Mail, Message
+from flask_socketio import SocketIO, emit, join_room, leave_room
+
 from flask_session import Session
-import csv, hashlib, hmac, time, random, os, string, json, pickle, base64
-from datetime import datetime
 
 app = Flask(__name__)
 app.debug = True
@@ -38,6 +48,8 @@ token_size = 50
 phash, psalt, prequested = None, None, None
 admin_sids = []
 
+leader_link_timeout = 24  # hours
+
 
 def get_creds():
     global phash, psalt, prequested
@@ -61,50 +73,99 @@ def save_creds(h, s, r):
     get_creds()
 
 
+def make_token():
+    return ''.join(random.choices(string.ascii_letters, k=token_size))
+
+
+def exists(data, check):
+    try:
+        if data[check] or data['data'][check]:
+            return True
+        return False
+    except:
+        return False
+
+
 class room():
-    def __init__(self, name, invites, photos):
+    def __init__(self, name, invites, photos, leaders, subinvites, key, creator_id):
         self.max_len = 100
         self.key_size = 10
         self.name = name
         self.people = []
         self.messages = []
         self.banned = []
-        self.key = None
-        self.make_key()
+        self.key = key if key else make_token()
         self.invites_enabled = invites
         self.photos_enabled = photos
-        self.leader = None
+        self.other_leaders = leaders
+        self.subinvites = subinvites
+        self.creator = {'userID': creator_id} if creator_id else None
+        self.leaders = []
+        self.token = None
+        self.token_time = None
+        self.set_token()
 
-    def make_key(self):
-        self.key = ''.join(random.choices(string.ascii_letters, k=self.key_size))
+    def set_token(self, refresh_time=True):
+        self.token = make_token()
+        if refresh_time:
+            self.token_time = time.time()
 
     def add_msg(self, msg):
         if len(self.messages) >= self.max_len:
             del self.messages[0]
         self.messages.append(msg)
 
-    def get_leader(self):
-        return self.leader
+    def add_leader(self, usr, creator=False):
+        print(self.leaders)
+        if self.get_leader(userID=usr['userID']):
+            if 'sid' not in usr and 'sid' in self.get_leader(userID=usr['userID']):
+                usr['sid'] = self.get_leader(userID=usr['userID'])['sid']
+            self.remove_leader(userID=usr['userID'])
+        if exists(usr, 'nickname') and self.get_leader(nick=usr['nickname']):
+            if 'sid' not in usr and 'sid' in self.get_leader(nick=usr['nickname']):
+                usr['sid'] = self.get_leader(nick=usr['nickname'])['sid']
+            self.remove_leader(nick=usr['nickname'])
+        self.leaders.append(usr)
+        print(self.creator)
+        print(usr)
+        print(usr['userID'] == self.creator['userID'])
+        if creator or (creator and usr['userID'] == self.creator['userID']):
+            self.creator = usr
+
+    # todo when admin joins room, needs to get list of all current users
+    # todo after visiting add leader link, login should auto fill w/ name of room
+    def get_leaders(self):
+        return self.leaders
 
     def get_names(self):
         return [x['nickname'] for x in self.people]
 
     def add_user(self, usr):
-        if self.get_user(usr['nickname']):
+        if self.get_user(nick=usr['nickname']):
             self.remove_user(nick=usr['nickname'])
-        if self.get_user(usr['userID']):
-            self.remove_user(nick=usr['userID'])
-        if self.leader and usr['userID'] == self.leader['userID']:
-            self.leader = usr
+        if self.get_user(userID=usr['userID']):
+            self.remove_user(userID=usr['userID'])
+        if self.get_leader(userID=usr['userID']):
+            self.remove_leader(userID=usr['userID'])
+            self.add_leader(usr)
         self.people.append(usr)
 
+    def remove_leader(self, nick=None, userID=None):
+        for i in range(len(self.leaders)):
+            if self.leaders[i]['nickname' if nick else 'userID'] == nick if nick else userID:
+                del self.leaders[i]
+                break
 
-    # todo add option for what to do when creator leaves in newroom.html then do that when creator leaves
     def remove_user(self, nick=None, userID=None):
         for i in range(len(self.people)):
             if self.people[i]['nickname' if nick else 'userID'] == nick if nick else userID:
                 del self.people[i]
                 break
+
+    def get_leader(self, nick=None, userID=None):
+        for i in range(len(self.leaders)):
+            if self.leaders[i]['nickname' if nick else 'userID'] == nick if nick else userID:
+                return self.leaders[i]
 
     def get_user(self, nick=None, userID=None):
         for i in range(len(self.people)):
@@ -119,12 +180,21 @@ def load_rooms():
     if not os.path.isfile('info/rooms.csv'):
         with open('info/rooms.csv', 'w', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow(['mainchat'])
+            writer.writerow(['mainchat', 'True', 'False', 'False', 'False', 'None', 'None'])
     with open('info/rooms.csv', 'r') as f:
         reader = csv.reader(f)
         for i in reader:
-            r.append(room(str(i[0]), True if i[1] == 'true' else False, True if i[2] == 'true' else False))
+            r.append(room(str(i[0]), i[1] == 'True', i[2] == 'True', i[3] == 'True', i[4] == 'True',
+                          None if i[5] == 'None' else i[5], None if i[6] == 'None' else i[6]))
         return r
+
+
+def save_room(r, save_key=True, save_creator=True):
+    with open('info/rooms.csv', 'a', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [r.name, r.invites_enabled, r.photos_enabled, r.other_leaders, r.subinvites, r.key if save_key else 'None',
+             r.creator['userID'] if save_creator else 'None'])
 
 
 # todo add method from admin panel to delete/save rooms (save to csv file)
@@ -145,6 +215,7 @@ max_len = 15
 rooms_dir = '/rooms/'
 invite_dir = '/invite/'
 reset_dir = '/admin/reset/'
+leader_dir = '/addleader'
 banned_rooms = []
 
 
@@ -166,13 +237,13 @@ def val_pw(pw):
         return 'Please provide a password'
 
 
-def val_room(name, real=True):
+def val_room(name):
     if name:
-        if min_len < len(name):
-            if max_len > len(name):
+        if min_len <= len(name):
+            if max_len >= len(name):
                 if name.isalnum():
                     if not name in banned_rooms:
-                        if not real or not get_room(name):
+                        if not get_room(name):
                             return True
                         else:
                             return 'Room name already in use'
@@ -190,8 +261,8 @@ def val_room(name, real=True):
 
 def val_nick(nick):
     if nick:
-        if min_len < len(nick):
-            if max_len > len(nick):
+        if min_len <= len(nick):
+            if max_len >= len(nick):
                 if nick.isalnum():
                     return True
                 else:
@@ -224,23 +295,10 @@ def timestamp():
     return datetime.now().strftime('%I:%M %p')
 
 
-def make_reset_token():
-    return ''.join(random.choices(string.ascii_letters, k=token_size))
-
-
 def setup_pass_change():
     global pass_reset_token
     save_creds(phash, psalt, time.time())
-    pass_reset_token = make_reset_token()
-
-
-def exists(data, check):
-    try:
-        if data[check] or data['data'][check]:
-            return True
-        return False
-    except:
-        return False
+    pass_reset_token = make_token()
 
 
 @login_manager.user_loader
@@ -276,22 +334,25 @@ def err_404(e):
 
 @app.route('/newroom', methods=['GET', 'POST'])
 def newroom():
-    print(session)
     if request.method == 'POST':
         if not exists(session, 'userName'):
             return redirect('/login')
         name = request.form.get('roomname')
-        result = val_room(name, real=False)
+        result = val_room(name)
         if result == True:
             session['chatroom'] = name
-            rooms.append(room(name, True if request.form.get('enableInvites') else False, True if request.form.get('enablePhotos') else False))
+            rooms.append(room(name, request.form.get('enableInvites') == 'on', request.form.get('enablePhotos') == 'on',
+                              request.form.get('addLeaders') == 'on', request.form.get('subAddLeaders') == 'on', None,
+                              session['userID']))
+            save_room(get_room(name), save_key=True)
             if request.form.get('enableAdmin'):
                 session['chatroom-key'] = get_room(name).key
-                get_room(name).leader = {'nickname': session["userName"], 'userID': session['userID']}
-                #resp = make_response(redirect(rooms_dir + str(name)))
-                #resp.set_cookie('room-key', get_room(name).key)
-                #return resp
-            #else:
+                get_room(name).add_leader({'nickname': session["userName"], 'userID': session['userID']}, creator=True)
+                get_room(name).add_user({'nickname': session["userName"], 'userID': session['userID']})
+                # resp = make_response(redirect(rooms_dir + str(name)))
+                # resp.set_cookie('room-key', get_room(name).key)
+                # return resp
+            # else:
             return redirect(rooms_dir + str(name))
         else:
             flash(result)
@@ -299,6 +360,8 @@ def newroom():
         return redirect('/login')
     return render_template('newroom.html')
 
+
+# todo menu buttons on chat.html arnt all on one line when all admin stuff enabled
 
 @app.route('/logout')
 def logout():
@@ -361,16 +424,27 @@ def login():
 
 @app.route(rooms_dir + '<name>')
 def priv_room(name):
+    print(session)
+    print(get_room(name).creator)
+    print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
     if get_room(name):
         if 'userName' in session and session['userID'] not in get_room(name).banned:
             roomLeader = 'none'
             people = []
+            inviteLeaders = 'none'
             if 'chatroom-key' in session and session['chatroom-key'] == get_room(name).key:
+                print('rooms_dir')
+                print(get_room(session['chatroom']).get_leaders())
+                get_room(session['chatroom']).add_leader({'userID': session['userID'], 'nickname': session['userName']})
+                print(get_room(session['chatroom']).get_leaders())
                 people = get_room(name).get_names()
                 roomLeader = ''
+                if get_room(name).subinvites or session['userID'] == get_room(name).creator['userID']:
+                    inviteLeaders = ''
             return render_template('chat.html', roomName=name, people=people, roomLeader=roomLeader,
                                    invites='' if get_room(name).invites_enabled else 'none',
-                                   photos='' if get_room(name).photos_enabled else 'none')
+                                   photos='' if get_room(name).photos_enabled else 'none',
+                                   otherLeaders=inviteLeaders)
         else:
             return redirect('/login')
     return render_template('404.html'), 404
@@ -425,13 +499,30 @@ def reset_pass():
     return redirect('/login')
 
 
+@app.route(leader_dir, methods=['GET', 'POST'])
+def add_leader():
+    chatroom = request.args.get('chatroom')
+    token = request.args.get('token')
+    if get_room(chatroom) and get_room(chatroom).other_leaders:
+        if token == get_room(chatroom).token:
+            if time.time() - get_room(chatroom).token_time < leader_link_timeout * 60 * 60:
+                get_room(chatroom).add_leader({'userID': session['userID']})
+                session['chatroom-key'] = get_room(chatroom).key
+                if not get_room(chatroom).subinvites:
+                    get_room(chatroom).set_token(refresh_time=False)
+                return render_template('addleader.html', roomName=chatroom, invalid=not get_room(chatroom).subinvites)
+            else:
+                return 'This leader invite token has expired, please get a new one'
+    return redirect('/login')
+
+
 @socketio.on('message')
 def chat_message(data):
     if session['userID'] not in get_room(session['chatroom']).banned:
         data['data']['timestamp'] = timestamp()
         data['data']['type'] = 'message'
         data['data']['user'] = session['userName']
-        #get_room(data['data']['room']).add_msg(data)
+        # get_room(data['data']['room']).add_msg(data)
         get_room(session['chatroom']).add_msg(data)
         emit('message', data, room=session['chatroom'])
 
@@ -451,7 +542,7 @@ def photo(data):
 
 @socketio.on('connect')
 def test_connect():
-    #if session['userID'] not in get_room(session['chatroom']).banned:
+    # if session['userID'] not in get_room(session['chatroom']).banned:
     emit('my response', {'data': 'Connected', 'count': 0})
 
 
@@ -464,17 +555,12 @@ def leave(data, admin=False):
         pass
     else:
         get_room(session['chatroom']).add_msg({'data': {'message': f'{session["userName"]} has left the server',
-                                                         'timestamp': timestamp(), 'type': 'announcement'}})
+                                                        'timestamp': timestamp(), 'type': 'announcement'}})
         get_room(session['chatroom']).remove_user(nick=session["userName"])
         # print(f'user {data["data"]["user"]} left room {data["data"]["room"]}')
-        emit('message', {'data': {'message': f'{session["userName"]} has left the server', 'timestamp': timestamp(),
+        emit('message', {'data': {'message': f'{session["userName"]} has left the server', 'update': 'removal',
+                                  'name': session['userName'], 'timestamp': timestamp(),
                                   'type': 'announcement'}}, room=session['chatroom'])
-        room_leaders = [get_room(session["chatroom"]).get_leader()] + admin_sids
-        for r in room_leaders:
-            join_room(f'{session["chatroom"]} admin', sid=r['sid'])
-        emit('update', {'data': {'type': 'removal', 'class': 'user', 'name': session['userName']}}, room=f'{session["chatroom"]} admin')
-        for r in room_leaders:
-            leave_room(f'{session["chatroom"]} admin', sid=r['sid'])
 
 
 @socketio.on('set connection')
@@ -489,45 +575,68 @@ def set_connect(data=None, sess=session, admin=False):
         if admin and exists(sess, 'master-key') and val_pw(sess['master-key']) == True:
             print('admin connect')
         else:
+            get_room(session['chatroom']).add_leader(
+                {'userID': session['userID'], 'nickname': session['userName'], 'sid': request.sid})
+
             get_room(sess['chatroom']).add_msg({'data': {'message': f'{sess["userName"]} has joined the server',
-                                                             'timestamp': timestamp(), 'type': 'announcement'}})
-            get_room(sess['chatroom']).add_user({'nickname': sess["userName"], 'userID': sess['userID'], 'sid': request.sid})
+                                                         'timestamp': timestamp(), 'type': 'announcement'}})
+            get_room(sess['chatroom']).add_user(
+                {'nickname': sess["userName"], 'userID': sess['userID'], 'sid': request.sid})
+            if sess['userID'] in [x['userID'] for x in get_room(sess['chatroom']).get_leaders()]:
+                get_room(sess['chatroom']).add_leader(
+                    {'nickname': sess["userName"], 'userID': sess['userID'], 'sid': request.sid})
             print(f'{sess["userName"]} has joined the room {sess["chatroom"]}')
-            emit('message', {'data': {'message': f'{sess["userName"]} has joined the server', 'timestamp': timestamp(),
+            emit('message', {'data': {'message': f'{sess["userName"]} has joined the server', 'update': 'addition',
+                                      'name': session['userName'], 'timestamp': timestamp(),
                                       'type': 'announcement'}}, room=sess['chatroom'])
-            room_leaders = [get_room(session["chatroom"]).get_leader()] + admin_sids if get_room(session["chatroom"]).get_leader() else admin_sids
-            for r in room_leaders:
-                join_room(f'{session["chatroom"]} admin', sid=r['sid'])
-            emit('update', {'data': {'type': 'add', 'class': 'user', 'name': session['userName']}},
-                 room=f'{session["chatroom"]} admin')
-            for r in room_leaders:
-                leave_room(f'{session["chatroom"]} admin', sid=r['sid'])
     else:
         join_room(sess['userID'])
-        emit('announcement', {'data': {'message': 'You have been banned from this room', 'timestamp': timestamp(), 'type': 'announcement'}}, room=sess['userID'])
+        emit('announcement', {'data': {'message': 'You have been banned from this room', 'timestamp': timestamp(),
+                                       'type': 'announcement'}}, room=sess['userID'])
         leave_room(sess['userID'])
 
-#todo room leader dropdown of members is not selectable for some reason - fix
+
+# todo room leader dropdown of members is not selectable for some reason - fix
 @socketio.on('kick user')
 def kick_user(data):
     if session['userID'] not in get_room(session['chatroom']).banned:
-        if exists(session, 'chatroom-key') and exists(session, 'chatroom') and session['chatroom-key'] == get_room(session['chatroom']).key:
+        if exists(session, 'chatroom-key') and exists(session, 'chatroom') and session['chatroom-key'] == get_room(
+                session['chatroom']).key:
             if data['data']['kick'] in get_room(session['chatroom']).get_names():
                 join_room(get_room(session['chatroom']).get_user(nick=data['data']['kick'])['userID'],
-                           sid=get_room(session['chatroom']).get_user(nick=data['data']['kick'])['sid'])
+                          sid=get_room(session['chatroom']).get_user(nick=data['data']['kick'])['sid'])
                 emit('message', {
                     'data': {'message': f'You were kicked by {session["userName"]}',
                              'timestamp': timestamp(),
-                             'type': 'announcement'}}, room=get_room(session['chatroom']).get_user(nick=data['data']['kick'])['userID'])
+                             'type': 'announcement'}},
+                     room=get_room(session['chatroom']).get_user(nick=data['data']['kick'])['userID'])
                 leave_room(get_room(session['chatroom']).get_user(nick=data['data']['kick'])['userID'],
-                          sid=get_room(session['chatroom']).get_user(nick=data['data']['kick'])['sid'])
-                leave_room(session['chatroom'], sid=get_room(session['chatroom']).get_user(nick=data['data']['kick'])['sid'])
-                get_room(session['chatroom']).banned.append(get_room(session['chatroom']).get_user(nick=data['data']['kick'])['userID'])
+                           sid=get_room(session['chatroom']).get_user(nick=data['data']['kick'])['sid'])
+                leave_room(session['chatroom'],
+                           sid=get_room(session['chatroom']).get_user(nick=data['data']['kick'])['sid'])
+                get_room(session['chatroom']).banned.append(
+                    get_room(session['chatroom']).get_user(nick=data['data']['kick'])['userID'])
                 emit('message', {
                     'data': {'message': f'{data["data"]["kick"]} was kicked by {session["userName"]}',
+                             'update': 'removal',
+                             'name': session['userName'],
                              'timestamp': timestamp(),
                              'type': 'announcement'}}, room=session['chatroom'])
                 print(f'{data["data"]["kick"]} was kicked by {session["userName"]} from {session["chatroom"]}')
+
+
+@socketio.on('get leader link')
+def send_leader_link():
+    if session['chatroom-key'] == get_room(session['chatroom']).key:
+        if get_room(session['chatroom']).subinvites or session['userID'] == get_room(session['chatroom']).creator[
+            'userID']:
+            # todo should room leader token reset if timed out here? prob
+            if time.time() - get_room(session['chatroom']).token_time > leader_link_timeout * 60 * 60:
+                get_room(session["chatroom"]).set_token()
+            leader_link = f'{request.url_root[:-1] + leader_dir}?token={get_room(session["chatroom"]).token}&chatroom={session["chatroom"]}'
+            join_room(session['userID'])
+            emit('leader link', {'data': {'link': leader_link}}, room=session['userID'])
+            leave_room(session['userID'])
 
 
 @socketio.on('admin connect')

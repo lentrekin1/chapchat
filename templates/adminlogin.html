@@ -3,10 +3,10 @@
 
 <head>
     <title>Admin Login - ChapChats</title>
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link href="{{ url_for('static', filename='favicon.ico') }}" rel="shortcut icon">
     <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
     <script>
         var date = new Date()
         date.setTime(date.getTime() + (24*60*60*1000));
@@ -14,6 +14,8 @@
         function setAdmin() {
             document.cookie = 'pass=' + document.getElementById('pass').value + ';expires=' + date.toUTCString() + '; path=/';
         }
+
+
 
     </script>
 </head>
@@ -24,7 +26,7 @@
     {% if messages %}
     {% for message in messages %}
     <div class="alert alert-warning alert-dismissible" role="alert">
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span>
+        <button aria-label="Close" class="close" data-dismiss="alert" type="button"><span aria-hidden="true">×</span>
         </button>
         {{message}}
     </div>
@@ -43,13 +45,13 @@
                     <h3 class="panel-title">Enter admin password</h3>
                 </div>
                 <div class="panel-body">
-                    <form role="form" name="frm-login" method="post">
+                    <form method="post" name="frm-login" role="form">
                         <fieldset>
                             <div class="form-group">
-                                <input class="form-control" placeholder="Enter Password" name="pass" id="pass"
+                                <input class="form-control" id="pass" name="pass" placeholder="Enter Password"
                                        type="password" value="">
                             </div>
-                            <button type="submit" class="btn btn-lg btn-success" name="main" onclick="setAdmin()">
+                            <button class="btn btn-lg btn-success" name="main" onclick="setAdmin()" type="submit">
                                 Login
                             </button>
                         </fieldset>

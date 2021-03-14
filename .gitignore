@@ -53,4 +53,6 @@ coverage.xml
 docs/_build/
 
 adminpass.pickle
+/flask_session
+/info
 
