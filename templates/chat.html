@@ -70,6 +70,13 @@
       refreshMessages(message);
     });
 
+    /*socket.on('user list', function (message) {
+        var users = message.data.users.split()
+        for (var i = 0; i < users.length; i++) {
+            $("#dropdownMain").append('<li><a class="dropdown-item" name="' + users[i] + '" id="' + users[i] + '" style="word-wrap: break-word;">' + users[i] + '</a></li>');
+        }
+    });*/
+
     socket.on('leader link', function (message) {
         try{
         navigator.share({

@@ -15,7 +15,32 @@ from flask_mail import Mail, Message
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
 from flask_session import Session
-
+#todo figure out how to do dev w/ ios - ngrok
+#todo add confirmation for kicking people / making leader
+#todo add support for emojis etc - not working on my phone
+#todo make adding leader like kicking somoeone
+#todo maybe add spaces in names
+#todo navigator share doesnt work on ios or incongito safair - only works w/ https not http
+#todo keep aspect ratio for images
+#todo timestamp time localization
+#todo should rooms care abt capitilization? prob not
+#todo no blank messages
+#todo typing notifications
+#todo move send button to right of bottom area
+#todo send or upload buttons would change to say "sending image..." until photo posted
+#todo pressing enter on login page shouldnt auto take u to main room
+#todo on mobile: keep full display on screen at all times
+#todo remove img button lower on screen on mobile and pc - fix so visible w/ out having to scroll
+#todo make space between chat bar and chat box and send button and bottom of box the same - see websiteupdate.jpg
+#todo room code -> room name
+#todo rename to ChapChat (like snapchat)
+#todo use deadspace in ui (mainly on pc) - background?
+#todo in chat, each user is diff color
+#todo add email to login page, show chap related ads
+#todo site-wide banners?
+#todo put leader related buttons in dropdown - undo making buttons smaller?
+#todo leader status didnt save on jays phone
+#todo when you press the add leaders link, it changes the "share invite link" button to "leader link copied"
 app = Flask(__name__)
 app.debug = True
 app.config['SECRET_KEY'] = 'tqwefsdd3.,edmk;vkflqjdmsndakd'
@@ -116,7 +141,6 @@ class room():
         self.messages.append(msg)
 
     def add_leader(self, usr, creator=False):
-        print(self.leaders)
         if self.get_leader(userID=usr['userID']):
             if 'sid' not in usr and 'sid' in self.get_leader(userID=usr['userID']):
                 usr['sid'] = self.get_leader(userID=usr['userID'])['sid']
@@ -126,9 +150,6 @@ class room():
                 usr['sid'] = self.get_leader(nick=usr['nickname'])['sid']
             self.remove_leader(nick=usr['nickname'])
         self.leaders.append(usr)
-        print(self.creator)
-        print(usr)
-        print(usr['userID'] == self.creator['userID'])
         if creator or (creator and usr['userID'] == self.creator['userID']):
             self.creator = usr
 
@@ -198,7 +219,7 @@ def save_room(r, save_key=True, save_creator=True):
 
 
 # todo add method from admin panel to delete/save rooms (save to csv file)
-# todo figure out why invalid ssl from GCP
+# todo figure out why invalid ssl from GCP - https://stackoverflow.com/a/42255561 - helpful?
 rooms = load_rooms()
 
 
@@ -218,8 +239,6 @@ reset_dir = '/admin/reset/'
 leader_dir = '/addleader'
 banned_rooms = []
 
-
-# todo add validation for user msgs?
 
 def val_pw(pw):
     if pw:
@@ -361,15 +380,12 @@ def newroom():
     return render_template('newroom.html')
 
 
-# todo menu buttons on chat.html arnt all on one line when all admin stuff enabled
-
 @app.route('/logout')
 def logout():
     logout_user()
     return redirect('/admin')
 
 
-# todo when admin pw change, old users still connected - fix
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
     if isinstance(val_pw(session['master-key']), str):
@@ -424,19 +440,13 @@ def login():
 
 @app.route(rooms_dir + '<name>')
 def priv_room(name):
-    print(session)
-    print(get_room(name).creator)
-    print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
     if get_room(name):
         if 'userName' in session and session['userID'] not in get_room(name).banned:
             roomLeader = 'none'
             people = []
             inviteLeaders = 'none'
             if 'chatroom-key' in session and session['chatroom-key'] == get_room(name).key:
-                print('rooms_dir')
-                print(get_room(session['chatroom']).get_leaders())
                 get_room(session['chatroom']).add_leader({'userID': session['userID'], 'nickname': session['userName']})
-                print(get_room(session['chatroom']).get_leaders())
                 people = get_room(name).get_names()
                 roomLeader = ''
                 if get_room(name).subinvites or session['userID'] == get_room(name).creator['userID']:
@@ -508,6 +518,7 @@ def add_leader():
             if time.time() - get_room(chatroom).token_time < leader_link_timeout * 60 * 60:
                 get_room(chatroom).add_leader({'userID': session['userID']})
                 session['chatroom-key'] = get_room(chatroom).key
+                #todo should token always be only one use or nah?
                 if not get_room(chatroom).subinvites:
                     get_room(chatroom).set_token(refresh_time=False)
                 return render_template('addleader.html', roomName=chatroom, invalid=not get_room(chatroom).subinvites)
@@ -573,8 +584,13 @@ def set_connect(data=None, sess=session, admin=False):
 
         join_room(sess['chatroom'])
         if admin and exists(sess, 'master-key') and val_pw(sess['master-key']) == True:
+            #emit('user list',
+            #     {'data': {'users': ','.join([x['nickname'] for x in get_room(session['chatroom']).people])}}, room=sess['chatroom'])
             print('admin connect')
         else:
+            #if exists(sess, 'room-key') and sess['room-key'] == get_room(sess['chatroom']).key:
+            #    emit('user list', {'data': {'users': ','.join([x['nickname'] for x in get_room(session['chatroom']).people])}})
+
             get_room(session['chatroom']).add_leader(
                 {'userID': session['userID'], 'nickname': session['userName'], 'sid': request.sid})
 
@@ -596,7 +612,6 @@ def set_connect(data=None, sess=session, admin=False):
         leave_room(sess['userID'])
 
 
-# todo room leader dropdown of members is not selectable for some reason - fix
 @socketio.on('kick user')
 def kick_user(data):
     if session['userID'] not in get_room(session['chatroom']).banned:
@@ -630,7 +645,6 @@ def send_leader_link():
     if session['chatroom-key'] == get_room(session['chatroom']).key:
         if get_room(session['chatroom']).subinvites or session['userID'] == get_room(session['chatroom']).creator[
             'userID']:
-            # todo should room leader token reset if timed out here? prob
             if time.time() - get_room(session['chatroom']).token_time > leader_link_timeout * 60 * 60:
                 get_room(session["chatroom"]).set_token()
             leader_link = f'{request.url_root[:-1] + leader_dir}?token={get_room(session["chatroom"]).token}&chatroom={session["chatroom"]}'
