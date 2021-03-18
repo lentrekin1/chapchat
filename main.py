@@ -7,6 +7,7 @@ import pickle
 import random
 import string
 import time
+import re
 from datetime import datetime
 
 from flask import Flask, render_template, session, request, redirect, flash
@@ -15,29 +16,15 @@ from flask_mail import Mail, Message
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
 from flask_session import Session
-#todo figure out how to do dev w/ ios - ngrok
-#todo add confirmation for kicking people / making leader
 #todo add support for emojis etc - not working on my phone
 #todo make adding leader like kicking somoeone
-#todo maybe add spaces in names
-#todo navigator share doesnt work on ios or incongito safair - only works w/ https not http
-#todo keep aspect ratio for images
-#todo timestamp time localization
-#todo should rooms care abt capitilization? prob not
-#todo no blank messages
+#todo fix ssl warning
 #todo typing notifications
-#todo move send button to right of bottom area
-#todo send or upload buttons would change to say "sending image..." until photo posted
-#todo pressing enter on login page shouldnt auto take u to main room
-#todo on mobile: keep full display on screen at all times
-#todo remove img button lower on screen on mobile and pc - fix so visible w/ out having to scroll
-#todo make space between chat bar and chat box and send button and bottom of box the same - see websiteupdate.jpg
-#todo room code -> room name
-#todo rename to ChapChat (like snapchat)
+#todo photo size function kinda wonky
+#todo image preview must be tiny w/ overflow:hidden
+#todo display looks bad on small devices
 #todo use deadspace in ui (mainly on pc) - background?
 #todo in chat, each user is diff color
-#todo add email to login page, show chap related ads
-#todo site-wide banners?
 #todo put leader related buttons in dropdown - undo making buttons smaller?
 #todo leader status didnt save on jays phone
 #todo when you press the add leaders link, it changes the "share invite link" button to "leader link copied"
@@ -158,8 +145,11 @@ class room():
     def get_leaders(self):
         return self.leaders
 
-    def get_names(self):
-        return [x['nickname'] for x in self.people]
+    def get_names(self, low=False):
+        if not low:
+            return [x['nickname'] for x in self.people]
+        else:
+            return [x['nickname'].lower() for x in self.people]
 
     def add_user(self, usr):
         if self.get_user(nick=usr['nickname']):
@@ -172,26 +162,51 @@ class room():
         self.people.append(usr)
 
     def remove_leader(self, nick=None, userID=None):
+        if nick:
+            nick = nick.lower()
         for i in range(len(self.leaders)):
-            if self.leaders[i]['nickname' if nick else 'userID'] == nick if nick else userID:
+            check = self.leaders[i]['nickname' if nick else 'userID']
+            if nick:
+                check = check.lower()
+            if check == nick if nick else userID:
                 del self.leaders[i]
                 break
 
     def remove_user(self, nick=None, userID=None):
+        if nick:
+            nick = nick.lower()
         for i in range(len(self.people)):
-            if self.people[i]['nickname' if nick else 'userID'] == nick if nick else userID:
+            check = self.people[i]['nickname' if nick else 'userID']
+            if nick:
+                check = check.lower()
+            if check == nick if nick else userID:
                 del self.people[i]
                 break
 
     def get_leader(self, nick=None, userID=None):
+        if nick:
+            nick = nick.lower()
         for i in range(len(self.leaders)):
-            if self.leaders[i]['nickname' if nick else 'userID'] == nick if nick else userID:
+            check = self.leaders[i]['nickname' if nick else 'userID']
+            if nick:
+                check = check.lower()
+            if check == nick if nick else userID:
                 return self.leaders[i]
 
     def get_user(self, nick=None, userID=None):
+        if nick:
+            nick = nick.lower()
         for i in range(len(self.people)):
-            if self.people[i]['nickname' if nick else 'userID'] == nick if nick else userID:
+            check = self.people[i]['nickname' if nick else 'userID']
+            if nick:
+                check = check.lower()
+            if check == nick if nick else userID:
                 return self.people[i]
+
+    def is_banned(self, uid):
+        if uid in [x['userID'] for x in self.banned]:
+            return True
+        return False
 
 
 def load_rooms():
@@ -225,7 +240,7 @@ rooms = load_rooms()
 
 def get_room(name):
     for r in rooms:
-        if r.name == name:
+        if r.name.lower() == name.lower():
             return r
     return None
 
@@ -260,8 +275,8 @@ def val_room(name):
     if name:
         if min_len <= len(name):
             if max_len >= len(name):
-                if name.isalnum():
-                    if not name in banned_rooms:
+                if re.match("^[A-Za-z0-9_-]*$", name):
+                    if not name.lower() in banned_rooms:
                         if not get_room(name):
                             return True
                         else:
@@ -269,7 +284,7 @@ def val_room(name):
                     else:
                         return 'Room name is not allowed'
                 else:
-                    return 'Room name can only have letters and numbers'
+                    return 'Room name can only have letters, numbers, dashes, and underscores'
             else:
                 return 'Please enter a shorter room name'
         else:
@@ -282,10 +297,10 @@ def val_nick(nick):
     if nick:
         if min_len <= len(nick):
             if max_len >= len(nick):
-                if nick.isalnum():
+                if re.match("^[A-Za-z0-9_-]*$", nick):
                     return True
                 else:
-                    return 'Nickname can only have letters and numbers'
+                    return 'Nickname can only have letters, number, dashes, and underscores'
             else:
                 return 'Please enter a shorter nickname'
         else:
@@ -311,7 +326,7 @@ def get_hash(pw):
 
 
 def timestamp():
-    return datetime.now().strftime('%I:%M %p')
+    return str(datetime.utcnow()) + 'Z'
 
 
 def setup_pass_change():
@@ -412,7 +427,7 @@ def login():
         if not request.form.get('nickname') or not result == True:
             flash(result)
         elif 'main' in request.form.keys():
-            if request.form.get('nickname') in get_room('mainchat').get_names():
+            if request.form.get('nickname').lower() in get_room('mainchat').get_names(low=True):
                 flash('This name is taken for this room')
             else:
                 session['userName'] = request.form.get('nickname')
@@ -421,7 +436,7 @@ def login():
         elif 'specific' in request.form.keys():
             if request.form.get('room'):
                 if get_room(request.form.get('room')):
-                    if request.form.get('nickname') in get_room(request.form.get('room')).get_names():
+                    if request.form.get('nickname').lower() in get_room(request.form.get('room')).get_names(low=True):
                         flash('This name is taken for this room')
                     else:
                         session['userName'] = request.form.get('nickname')
@@ -441,7 +456,7 @@ def login():
 @app.route(rooms_dir + '<name>')
 def priv_room(name):
     if get_room(name):
-        if 'userName' in session and session['userID'] not in get_room(name).banned:
+        if 'userName' in session and not get_room(name).is_banned(session['userID']):
             roomLeader = 'none'
             people = []
             inviteLeaders = 'none'
@@ -468,7 +483,7 @@ def enter_room(name):
         if request.method == 'POST':
             result = val_nick(request.form.get('nickname'))
             if result == True:
-                if request.form.get('nickname') in get_room(name).get_names():
+                if request.form.get('nickname') in get_room(name).get_names(low=True):
                     flash('This name is taken for this room')
                 else:
                     session['userName'] = request.form.get('nickname')
@@ -489,7 +504,7 @@ def reset_pass():
                 if request.form.get('newpass') == request.form.get('confirmpass'):
                     result = val_pw(request.form.get('newpass'))
                     if result == 'Incorrect password':
-                        session[''] = request.form.get('newpass')
+                        session['pass'] = request.form.get('newpass')
                         session['name'] = 'admin'
                         save_creds(get_hash(request.form.get('newpass')), psalt, time.time())
                         pass_reset_token = None
@@ -529,26 +544,30 @@ def add_leader():
 
 @socketio.on('message')
 def chat_message(data):
-    if session['userID'] not in get_room(session['chatroom']).banned:
-        data['data']['timestamp'] = timestamp()
-        data['data']['type'] = 'message'
-        data['data']['user'] = session['userName']
-        # get_room(data['data']['room']).add_msg(data)
-        get_room(session['chatroom']).add_msg(data)
-        emit('message', data, room=session['chatroom'])
+    if not get_room(session['chatroom']).is_banned(session['userID']):
+        if data['data']['message'] != '' and not data['data']['message'].isspace():
+            data['data']['timestamp'] = timestamp()
+            data['data']['type'] = 'message'
+            data['data']['user'] = session['userName']
+            # get_room(data['data']['room']).add_msg(data)
+            get_room(session['chatroom']).add_msg(data)
+            emit('message', data, room=session['chatroom'].lower())
 
 
 # todo add logging
 # todo make it so can see full photo when zoomed in on mobile
 @socketio.on('photo')
 def photo(data):
-    if session['userID'] not in get_room(session['chatroom']).banned:
-        if get_room(session['chatroom']).photos_enabled:
+    if not get_room(session['chatroom']).is_banned(session['userID']):
+        if get_room(session['chatroom']).photos_enabled and data['data']['photo'] != '' and not data['data']['photo'].isspace():
             data['data']['timestamp'] = timestamp()
             data['data']['type'] = 'photo'
             data['data']['user'] = session['userName']
             get_room(session['chatroom']).add_msg(data)
-            emit('message', {'data': data['data']}, room=session['chatroom'])
+            join_room(room=session['userID'])
+            emit('recv')
+            leave_room(room=session['userID'])
+            emit('message', {'data': data['data']}, room=session['chatroom'].lower())
 
 
 @socketio.on('connect')
@@ -560,7 +579,7 @@ def test_connect():
 @socketio.on('leave')
 def leave(data, admin=False):
     data['data']['timestamp'] = timestamp()
-    leave_room(session['chatroom'])
+    leave_room(session['chatroom'].lower())
     if admin and exists(session, 'master-key') and val_pw(session['master-key']) == True:
         # print('admin dc')
         pass
@@ -571,18 +590,18 @@ def leave(data, admin=False):
         # print(f'user {data["data"]["user"]} left room {data["data"]["room"]}')
         emit('message', {'data': {'message': f'{session["userName"]} has left the server', 'update': 'removal',
                                   'name': session['userName'], 'timestamp': timestamp(),
-                                  'type': 'announcement'}}, room=session['chatroom'])
+                                  'type': 'announcement'}}, room=session['chatroom'].lower())
 
 
 @socketio.on('set connection')
 def set_connect(data=None, sess=session, admin=False):
-    if sess['userID'] not in get_room(sess['chatroom']).banned:
+    if not get_room(session['chatroom']).is_banned(session['userID']):
         join_room(sess['userName'])
         for m in get_room(sess['chatroom']).messages:
             emit('message', m, room=sess['userName'])
         leave_room(sess['userName'])
 
-        join_room(sess['chatroom'])
+        join_room(sess['chatroom'].lower())
         if admin and exists(sess, 'master-key') and val_pw(sess['master-key']) == True:
             #emit('user list',
             #     {'data': {'users': ','.join([x['nickname'] for x in get_room(session['chatroom']).people])}}, room=sess['chatroom'])
@@ -604,7 +623,7 @@ def set_connect(data=None, sess=session, admin=False):
             print(f'{sess["userName"]} has joined the room {sess["chatroom"]}')
             emit('message', {'data': {'message': f'{sess["userName"]} has joined the server', 'update': 'addition',
                                       'name': session['userName'], 'timestamp': timestamp(),
-                                      'type': 'announcement'}}, room=sess['chatroom'])
+                                      'type': 'announcement'}}, room=sess['chatroom'].lower())
     else:
         join_room(sess['userID'])
         emit('announcement', {'data': {'message': 'You have been banned from this room', 'timestamp': timestamp(),
@@ -614,10 +633,10 @@ def set_connect(data=None, sess=session, admin=False):
 
 @socketio.on('kick user')
 def kick_user(data):
-    if session['userID'] not in get_room(session['chatroom']).banned:
+    if not get_room(session['chatroom']).is_banned(session['userID']):
         if exists(session, 'chatroom-key') and exists(session, 'chatroom') and session['chatroom-key'] == get_room(
                 session['chatroom']).key:
-            if data['data']['kick'] in get_room(session['chatroom']).get_names():
+            if data['data']['kick'] in get_room(session['chatroom']).get_names(low=True):
                 join_room(get_room(session['chatroom']).get_user(nick=data['data']['kick'])['userID'],
                           sid=get_room(session['chatroom']).get_user(nick=data['data']['kick'])['sid'])
                 emit('message', {
@@ -630,13 +649,13 @@ def kick_user(data):
                 leave_room(session['chatroom'],
                            sid=get_room(session['chatroom']).get_user(nick=data['data']['kick'])['sid'])
                 get_room(session['chatroom']).banned.append(
-                    get_room(session['chatroom']).get_user(nick=data['data']['kick'])['userID'])
+                    get_room(session['chatroom']).get_user(nick=data['data']['kick']))
                 emit('message', {
                     'data': {'message': f'{data["data"]["kick"]} was kicked by {session["userName"]}',
                              'update': 'removal',
                              'name': session['userName'],
                              'timestamp': timestamp(),
-                             'type': 'announcement'}}, room=session['chatroom'])
+                             'type': 'announcement'}}, room=session['chatroom'].lower())
                 print(f'{data["data"]["kick"]} was kicked by {session["userName"]} from {session["chatroom"]}')
 
 
@@ -647,7 +666,7 @@ def send_leader_link():
             'userID']:
             if time.time() - get_room(session['chatroom']).token_time > leader_link_timeout * 60 * 60:
                 get_room(session["chatroom"]).set_token()
-            leader_link = f'{request.url_root[:-1] + leader_dir}?token={get_room(session["chatroom"]).token}&chatroom={session["chatroom"]}'
+            leader_link = f'{request.url_root[:-1] + leader_dir}?token={get_room(session["chatroom"]).token}&chatroom={session["chatroom"].lower()}'
             join_room(session['userID'])
             emit('leader link', {'data': {'link': leader_link}}, room=session['userID'])
             leave_room(session['userID'])
@@ -676,8 +695,9 @@ def announce(data):
     data['data']['timestamp'] = timestamp()
     data['data']['type'] = 'announcement'
     if exists(session, 'master-key') and val_pw(session['master-key']) == True:
-        get_room(session['chatroom']).add_msg(data)
-        emit('message', data, room=session['chatroom'])
+        if data['data']['message'] != '' and not data['data']['message'].isspace():
+            get_room(session['chatroom']).add_msg(data)
+            emit('message', data, room=session['chatroom'].lower())
 
 
 @socketio.on('admin photo')
@@ -685,8 +705,9 @@ def announce(data):
     data['data']['timestamp'] = timestamp()
     data['data']['type'] = 'announcement photo'
     if exists(session, 'master-key') and val_pw(session['master-key']) == True:
-        get_room(session['chatroom']).add_msg(data)
-        emit('message', data, room=session['chatroom'])
+        if data['data']['message'] != '' and not data['data']['message'].isspace():
+            get_room(session['chatroom']).add_msg(data)
+            emit('message', data, room=session['chatroom'].lower())
 
 
 @socketio.on('change admin pass')
