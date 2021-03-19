@@ -4,20 +4,14 @@ env: flex
 runtime_config:
   python_version: 3.6
 
-#network:
-#  session_affinity: true
-
 manual_scaling:
   instances: 1
 
 entrypoint: gunicorn -b :8080 -k eventlet main:app
-
-#libraries:
-#  - name: PIL
-#    version: latest
 
 handlers:
   - url: /static
     static_dir: static
   - url: /.*
     script: auto
+    secure: always

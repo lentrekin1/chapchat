@@ -145,7 +145,7 @@
       }
 
       if (message.data.type == "announcement") {
-      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + '&#60;' + message.data.message + '&#62;' + '<br/></div></div></div></li>');
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + message.data.message + '<br/></div></div></div></li>');
       $(".media-list").append('<small style="color:red;">' + getTimestamp(message.data.timestamp) + '</small>');
       }
 
@@ -217,9 +217,9 @@
     })
 
     function leaveRoom() {
-      //$.cookie("old-nickname", $.cookie("realtime-chat-nickname"));
-      //document.cookie = 'realtime-chat-nickname=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-      location.href = '/login'
+      if (confirm('Are you sure you want to leave?')) {
+        location.href = '/login'
+      }
     }
 
     function previewImg() {
@@ -294,11 +294,6 @@
       display: none;
     }
 
-    @media (max-width: 420px) {
-      .btn-sm {
-        padding:4px;
-      }
-
     @media (max-height: 700px) {
       #title {
         display: none;
@@ -324,8 +319,13 @@
                         <button class="btn btn-sm btn-danger" id="leave" name="leave" onclick="leaveRoom()">Leave
                         </button>
 
-                        <div class="dropdown pull-right form-row justify-content-center"
-                             id="kick screen" style="display:{{ roomLeader }};">
+                        <button class="btn btn-primary btn-sm" style="display:{{ roomLeader }};" type="button" data-toggle="collapse" data-target="#leaderTools" aria-expanded="false" aria-controls="leaderTools">
+                            Leader Tools
+                        </button>
+                        <div class="collapse clearfix" id="leaderTools" style="position: absolute;z-index: 1;">
+                            <br>
+                        <div class="dropdown form-row justify-content-center"
+                             id="kick screen">
                             <button aria-expanded="false" aria-haspopup="true"
                                     class="btn btn-info btn-sm dropdown-toggle"
                                     data-toggle="dropdown" id="userDropdown" type="button">Select user
@@ -341,9 +341,10 @@
                             <button class="btn btn-primary btn-sm" id="kickUser" onclick="kickUser()">Kick</button>
                             <button class="btn btn-primary btn-sm" id="addLeader" onclick="addLeader()" style="display:{{ inviteLeaders }}">Add Leader</button>
                         </div>
+                            </div>
                     </div>
                 </div>
-                <div class="panel-body fixed-panel" id="scrollbox" style="max-height: 1;overflow-y: scroll;">
+                <div class="panel-body fixed-panel" id="scrollbox" style="max-height: 1;overflow-y: scroll;position: relative;">
                     <ul class="media-list" id="chatList">
                     </ul>
                 </div>

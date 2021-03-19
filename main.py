@@ -8,6 +8,7 @@ import random
 import string
 import time
 import re
+import logging
 from datetime import datetime
 
 from flask import Flask, render_template, session, request, redirect, flash
@@ -20,8 +21,24 @@ from flask_session import Session
 #fix ssl warning
 #typing notifications
 #use deadspace in ui (mainly on pc) - background?
-#todo put leader related buttons in dropdown - undo making buttons smaller?
+#todo leader collapse has no background - bad?
 #leader status didnt save on jays phone
+
+if not os.path.isdir('logs'):
+    os.mkdir('logs')
+
+token_size = 50
+
+def make_token(size=token_size):
+    return ''.join(random.choices(string.ascii_letters, k=size))
+
+log_token = make_token(size=7)
+filename = 'logs\{:%Y_%m_%d_%H}-' + log_token + '.log'
+logging.basicConfig(filename=filename.format(datetime.now()),
+                            format='%(asctime)s | %(levelname)-8s | %(message)s', filemode='w')
+logger = logging.getLogger("ChapChat")
+logger.setLevel(logging.DEBUG)
+
 app = Flask(__name__)
 app.debug = True
 app.config['SECRET_KEY'] = 'tqwefsdd3.,edmk;vkflqjdmsndakd'
@@ -50,7 +67,6 @@ admin_email = 'lancee478@gmail.com'
 pass_file = 'adminpass.pickle'
 admin_pass_timeout = 30  # minutes
 pass_reset_token = None
-token_size = 50
 phash, psalt, prequested = None, None, None
 admin_sids = []
 
@@ -77,11 +93,6 @@ def save_creds(h, s, r):
     with open(pass_file, 'wb') as f:
         pickle.dump({'phash': h, 'psalt': s, 'prequested': r}, f)
     get_creds()
-
-
-def make_token():
-    return ''.join(random.choices(string.ascii_letters, k=token_size))
-
 
 def exists(data, check):
     try:
@@ -135,8 +146,6 @@ class room():
         if creator or (creator and usr['userID'] == self.creator['userID']):
             self.creator = usr
 
-    # todo when admin joins room, needs to get list of all current users
-    # todo after visiting add leader link, login should auto fill w/ name of room
     def get_leaders(self):
         return self.leaders
 
@@ -375,6 +384,7 @@ def newroom():
                               request.form.get('addLeaders') == 'on', request.form.get('subAddLeaders') == 'on', None,
                               session['userID']))
             save_room(get_room(name), save_key=True)
+            app.logger.info(f'{session["userName"]} (userID = {session["userID"]} created the room {name}')
             if request.form.get('enableAdmin'):
                 session['chatroom-key'] = get_room(name).key
                 get_room(name).add_leader({'nickname': session["userName"], 'userID': session['userID']}, creator=True)
@@ -445,7 +455,6 @@ def login():
         elif 'newroom' in request.form.keys():
             session['userName'] = request.form.get('nickname')
             return redirect('/newroom')
-        # print(list(request.form.keys()))
     return render_template('login.html')
 
 
@@ -553,8 +562,6 @@ def chat_message(data):
             emit('message', data, room=session['chatroom'].lower())
 
 
-# todo add logging
-# todo make it so can see full photo when zoomed in on mobile
 @socketio.on('photo')
 def photo(data):
     if not get_room(session['chatroom']).is_banned(session['userID']):
@@ -580,13 +587,12 @@ def leave(data, admin=False):
     data['data']['timestamp'] = timestamp()
     leave_room(session['chatroom'].lower())
     if admin and exists(session, 'master-key') and val_pw(session['master-key']) == True:
-        # print('admin dc')
-        pass
+        app.logger.info(f'Admin (userID={session["userID"]}) disconnected from room {session["chatroom"]}')
     else:
         get_room(session['chatroom']).add_msg({'data': {'message': f'{session["userName"]} has left the server',
                                                         'timestamp': timestamp(), 'type': 'announcement'}})
         get_room(session['chatroom']).remove_user(nick=session["userName"])
-        # print(f'user {data["data"]["user"]} left room {data["data"]["room"]}')
+        app.logger.info(f'User {session["userName"]} (userID={session["userID"]}) left room {session["chatroom"]}')
         emit('message', {'data': {'message': f'{session["userName"]} has left the server', 'update': 'removal',
                                   'name': session['userName'], 'timestamp': timestamp(),
                                   'type': 'announcement'}}, room=session['chatroom'].lower())
@@ -605,7 +611,7 @@ def set_connect(data=None, sess=session, admin=False):
         if admin and exists(sess, 'master-key') and val_pw(sess['master-key']) == True:
             #emit('user list',
             #     {'data': {'users': ','.join([x['nickname'] for x in get_room(session['chatroom']).people])}}, room=sess['chatroom'])
-            print('admin connect')
+            app.logger.info(f'Admin (userID={session["userID"]}) connected to room {session["chatroom"]}')
         else:
             #if exists(sess, 'room-key') and sess['room-key'] == get_room(sess['chatroom']).key:
             #    emit('user list', {'data': {'users': ','.join([x['nickname'] for x in get_room(session['chatroom']).people])}})
@@ -620,7 +626,7 @@ def set_connect(data=None, sess=session, admin=False):
             if sess['userID'] in [x['userID'] for x in get_room(sess['chatroom']).get_leaders()]:
                 get_room(sess['chatroom']).add_leader(
                     {'nickname': sess["userName"], 'userID': sess['userID'], 'sid': request.sid})
-            print(f'{sess["userName"]} has joined the room {sess["chatroom"]}')
+            app.logger.info(f'{sess["userName"]} (userID={session["userID"]}) has joined the room {sess["chatroom"]}')
             emit('message', {'data': {'message': f'{sess["userName"]} has joined the server', 'update': 'addition',
                                       'name': session['userName'], 'timestamp': timestamp(),
                                       'type': 'announcement'}}, room=sess['chatroom'].lower())
@@ -637,6 +643,8 @@ def kick_user(data):
         if exists(session, 'chatroom-key') and exists(session, 'chatroom') and session['chatroom-key'] == get_room(
                 session['chatroom']).key:
             if data['data']['kick'] in get_room(session['chatroom']).get_names(low=True):
+                app.logger.info(
+                    f'{data["data"]["kick"]} (userID={get_room(session["chatroom"]).get_user(nick=data["data"]["kick"])["userID"]}) was kicked by {session["userName"]} (userID={session["userID"]}) from {session["chatroom"]}')
                 join_room(get_room(session['chatroom']).get_user(nick=data['data']['kick'])['userID'],
                           sid=get_room(session['chatroom']).get_user(nick=data['data']['kick'])['sid'])
                 emit('message', {
@@ -656,7 +664,7 @@ def kick_user(data):
                              'name': session['userName'],
                              'timestamp': timestamp(),
                              'type': 'announcement'}}, room=session['chatroom'].lower())
-                print(f'{data["data"]["kick"]} was kicked by {session["userName"]} from {session["chatroom"]}')
+
 
 @socketio.on('add leader')
 def add_leader(data):
@@ -664,6 +672,8 @@ def add_leader(data):
         if get_room(session['chatroom']).subinvites or session['userID'] == get_room(session['chatroom']).creator[
             'userID']:
             get_room(session['chatroom']).add_leader(get_room(session['chatroom']).get_user(nick=data['data']['user']))
+            app.logger.info(
+                f"User {data['data']['user']} (userID = {get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID']}) was made a leader of {session['chatroom']} by {session['userName']} (userID = {session['userID']})")
             join_room(get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'], sid=get_room(session['chatroom']).get_user(nick=data['data']['user'])['sid'])
             emit('given leader', {'data': {'message': f'You were made a leader of {session["chatroom"]} by {session["userName"]}', 'for': get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'], 'timestamp': timestamp(), 'type': 'announcement'}}, room=get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'])
             get_room(session['chatroom']).pending_leaders.append(get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'])
