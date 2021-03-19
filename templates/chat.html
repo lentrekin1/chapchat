@@ -40,7 +40,8 @@
           //var length = document.getElementById('userDropdown').offsetWidth;
           document.getElementById('userDropdown').innerHTML = $(this).text();
           //document.getElementById('userDropdown').style.width = length + 'px';
-        });
+      });
+
     }
 
     socket.on('connect', function () {
@@ -79,7 +80,12 @@
         document.getElementById('sendMessage').innerHTML = 'SEND <span class="glyphicon glyphicon-send"></span>'
     });
 
-    socket.on('leader link', function (message) {
+    socket.on('given leader', function (message) {
+        localStorage.setItem("givenLeader", JSON.stringify(message));
+        document.location.reload();
+    });
+
+    /*socket.on('leader link', function (message) {
         try{
         navigator.share({
           title: 'Share this link to add leaders to this chatroom',
@@ -98,23 +104,25 @@
             document.getElementById('addLead').innerHTML = 'Invite Leaders';
         }, 3000);
       }
-    });
+    });*/
 
 
-    function addLeaders() {
-        if (confirm('Do you want to share a link to add a leader?')) {
-            socket.emit('get leader link');
+    function addLeader() {
+        if (document.getElementById('userDropdown').innerHTML.trim() !== 'Select user') {
+            if (confirm('Are you sure you want to add ' + document.getElementById('userDropdown').innerHTML.trim() + ' as a leader?')) {
+                socket.emit('add leader', {data: {user: document.getElementById('userDropdown').innerHTML.trim()}});
+            }
         }
     }
 
-    function resize(maxW, maxH, b64) {
+    /*function resize(maxW, maxH, b64) {
         var img = new Image();
         img.src = b64;
         var oldWidth = img.width
         var oldHeight = img.height
         var ratio = Math.min(maxW / oldWidth, maxH / oldHeight);
         return [oldWidth*ratio, oldHeight*ratio];
-    }
+    }*/
 
     function getTimestamp(ts) {
           var date = new Date(ts);
@@ -133,8 +141,7 @@
       var shouldScroll = $panel[0].scrollHeight - $panel.height() - 31 <= $panel.scrollTop();
 
       if (message.data.type == "message") {
-      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '&#60;' + message.data.user + '&#62;' + ': ' + message.data.message + '<br/></div></div></div></li>');
-      $(".media-list").append('<small>' + getTimestamp(message.data.timestamp) + '</small>');
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '<strong>' + message.data.user + '</strong>' + '<small>' + '  ' + getTimestamp(message.data.timestamp) + '</small>' + '<br/>' + message.data.message + '</div></div></div></li>');
       }
 
       if (message.data.type == "announcement") {
@@ -148,9 +155,17 @@
       }
 
       if (message.data.type == "photo") {
-      var newSize = resize(normalMaxWidth, normalMaxHeight, message.data.photo);
-      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '&#60;' + message.data.user + '&#62;' + ': ' + '<img src="' + message.data.photo + '" width="' + newSize[0] + '" height="' + newSize[1] + '" onclick="showFull(this)"/>' + '<br/></div></div></div></li>');
-      $(".media-list").append('<small>' + getTimestamp(message.data.timestamp) + '</small>');
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '<strong>' + message.data.user + '</strong>' + '<small>' + '  ' + getTimestamp(message.data.timestamp) + '</small>' + '<br/>' + '<img src="' + message.data.photo + '" style="max-width:300px;max-height:300px"/>' + '<br/></div></div></div></li>');
+      }
+
+      if (message.data.type == "caught up") {
+          var leaderMsg = JSON.parse(localStorage.getItem("givenLeader"));
+          if (leaderMsg && leaderMsg.data.for == message.data.for) {
+            refreshMessages(leaderMsg);
+
+          }
+      } else {
+        $(".media-list").append('<hr style="margin-top:10px;margin-bottom:10px;"/>');
       }
 
       if (shouldScroll) {
@@ -223,7 +238,7 @@
       }
     }
 
-    function showFull(e) {
+    /*function showFull(e) {
       if (e.height <= normalMaxHeight && e.width <= normalMaxWidth) {
         var newSize = resize(enlargedMaxWidth, enlargedMaxHeight, e.src);
       } else {
@@ -231,7 +246,7 @@
       }
       e.width = newSize[0];
       e.height = newSize[1];
-    }
+    }*/
 
     function shareLink() {
       try{
@@ -255,11 +270,11 @@
     }
 
      function kickUser() {
-        if (confirm('Are you sure you want to kick ' + document.getElementById('userDropdown').innerHTML.trim() + '?')) {
-            if (document.getElementById('userDropdown').innerHTML.trim() !== 'Select a user') {
+        if (document.getElementById('userDropdown').innerHTML.trim() !== 'Select user') {
+            if (confirm('Are you sure you want to kick ' + document.getElementById('userDropdown').innerHTML.trim() + '?')) {
             socket.emit('kick user', {data: {kick: document.getElementById('userDropdown').innerHTML}});
             }
-            document.getElementById('userDropdown').innerHTML = 'Select a user'
+            document.getElementById('userDropdown').innerHTML = 'Select user'
         }
      }
 
@@ -306,11 +321,9 @@
                         <button class="btn btn-info btn-sm" id="share" onclick="shareLink()"
                                 style="display:{{ invites }}">Share Invite
                         </button>
-                        <button class="btn btn-info btn-sm" id="addLead" onclick="addLeaders()"
-                                style="display:{{ otherLeaders }}">Add Leaders
-                        </button>
                         <button class="btn btn-sm btn-danger" id="leave" name="leave" onclick="leaveRoom()">Leave
                         </button>
+
                         <div class="dropdown pull-right form-row justify-content-center"
                              id="kick screen" style="display:{{ roomLeader }};">
                             <button aria-expanded="false" aria-haspopup="true"
@@ -326,6 +339,7 @@
                                 {% endfor %}
                             </ul>
                             <button class="btn btn-primary btn-sm" id="kickUser" onclick="kickUser()">Kick</button>
+                            <button class="btn btn-primary btn-sm" id="addLeader" onclick="addLeader()" style="display:{{ inviteLeaders }}">Add Leader</button>
                         </div>
                     </div>
                 </div>
@@ -338,7 +352,7 @@
                     <label class="btn btn-info" for="photo" id="photowrap" style="vertical-align:top;margin:5px;display: {{ photos }}">
                         Upload an image
                     </label>
-                    <img height="30" id="preview" src="#" style="display: none;margin:5px;" width="30">
+                    <img height="40" id="preview" src="#" style="display: none;margin:5px;" width="40">
                     <input accept=".jpg, .jpeg, .png" id="photo" onclick="return previewImg();" onchange="previewImg()" type="file">
                     <button class="btn btn-info" id="sendMessage" style="margin:5px;float:right;" type="button">SEND <span
                             class="glyphicon glyphicon-send"></span></button>

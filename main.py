@@ -16,18 +16,12 @@ from flask_mail import Mail, Message
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
 from flask_session import Session
-#todo add support for emojis etc - not working on my phone
-#todo make adding leader like kicking somoeone
-#todo fix ssl warning
-#todo typing notifications
-#todo photo size function kinda wonky
-#todo image preview must be tiny w/ overflow:hidden
-#todo display looks bad on small devices
-#todo use deadspace in ui (mainly on pc) - background?
-#todo in chat, each user is diff color
+#emojis etc - not working on my phone
+#fix ssl warning
+#typing notifications
+#use deadspace in ui (mainly on pc) - background?
 #todo put leader related buttons in dropdown - undo making buttons smaller?
-#todo leader status didnt save on jays phone
-#todo when you press the add leaders link, it changes the "share invite link" button to "leader link copied"
+#leader status didnt save on jays phone
 app = Flask(__name__)
 app.debug = True
 app.config['SECRET_KEY'] = 'tqwefsdd3.,edmk;vkflqjdmsndakd'
@@ -113,6 +107,7 @@ class room():
         self.subinvites = subinvites
         self.creator = {'userID': creator_id} if creator_id else None
         self.leaders = []
+        self.pending_leaders = []
         self.token = None
         self.token_time = None
         self.set_token()
@@ -199,6 +194,7 @@ class room():
         for i in range(len(self.people)):
             check = self.people[i]['nickname' if nick else 'userID']
             if nick:
+
                 check = check.lower()
             if check == nick if nick else userID:
                 return self.people[i]
@@ -457,6 +453,9 @@ def login():
 def priv_room(name):
     if get_room(name):
         if 'userName' in session and not get_room(name).is_banned(session['userID']):
+            if session['userID'] in get_room(session['chatroom']).pending_leaders:
+                session['chatroom-key'] = get_room(name).key
+                get_room(session['chatroom']).pending_leaders.remove(get_room(session['chatroom']).get_leader(nick=session['userName'])['userID'])
             roomLeader = 'none'
             people = []
             inviteLeaders = 'none'
@@ -464,12 +463,12 @@ def priv_room(name):
                 get_room(session['chatroom']).add_leader({'userID': session['userID'], 'nickname': session['userName']})
                 people = get_room(name).get_names()
                 roomLeader = ''
-                if get_room(name).subinvites or session['userID'] == get_room(name).creator['userID']:
+                if get_room(name).other_leaders == get_room(name).subinvites == True or (get_room(name).other_leaders and session['userID'] == get_room(name).creator['userID']):
                     inviteLeaders = ''
             return render_template('chat.html', roomName=name, people=people, roomLeader=roomLeader,
                                    invites='' if get_room(name).invites_enabled else 'none',
                                    photos='' if get_room(name).photos_enabled else 'none',
-                                   otherLeaders=inviteLeaders)
+                                   inviteLeaders=inviteLeaders)
         else:
             return redirect('/login')
     return render_template('404.html'), 404
@@ -524,7 +523,7 @@ def reset_pass():
     return redirect('/login')
 
 
-@app.route(leader_dir, methods=['GET', 'POST'])
+'''@app.route(leader_dir, methods=['GET', 'POST'])
 def add_leader():
     chatroom = request.args.get('chatroom')
     token = request.args.get('token')
@@ -539,7 +538,7 @@ def add_leader():
                 return render_template('addleader.html', roomName=chatroom, invalid=not get_room(chatroom).subinvites)
             else:
                 return 'This leader invite token has expired, please get a new one'
-    return redirect('/login')
+    return redirect('/login')'''
 
 
 @socketio.on('message')
@@ -599,6 +598,7 @@ def set_connect(data=None, sess=session, admin=False):
         join_room(sess['userName'])
         for m in get_room(sess['chatroom']).messages:
             emit('message', m, room=sess['userName'])
+        emit('message', {'data': {'type': 'caught up', 'for': sess['userID'], 'timestamp': timestamp()}}, room=sess['userName'])
         leave_room(sess['userName'])
 
         join_room(sess['chatroom'].lower())
@@ -658,8 +658,20 @@ def kick_user(data):
                              'type': 'announcement'}}, room=session['chatroom'].lower())
                 print(f'{data["data"]["kick"]} was kicked by {session["userName"]} from {session["chatroom"]}')
 
+@socketio.on('add leader')
+def add_leader(data):
+    if session['chatroom-key'] == get_room(session['chatroom']).key:
+        if get_room(session['chatroom']).subinvites or session['userID'] == get_room(session['chatroom']).creator[
+            'userID']:
+            get_room(session['chatroom']).add_leader(get_room(session['chatroom']).get_user(nick=data['data']['user']))
+            join_room(get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'], sid=get_room(session['chatroom']).get_user(nick=data['data']['user'])['sid'])
+            emit('given leader', {'data': {'message': f'You were made a leader of {session["chatroom"]} by {session["userName"]}', 'for': get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'], 'timestamp': timestamp(), 'type': 'announcement'}}, room=get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'])
+            get_room(session['chatroom']).pending_leaders.append(get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'])
+            leave_room(get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'], sid=get_room(session['chatroom']).get_user(data['data']['user'])['sid'])
+            #get_room(session['chatroom']).add_leader({'userID': session['userID']})
+            #session['chatroom-key'] = get_room(chatroom).key
 
-@socketio.on('get leader link')
+'''@socketio.on('get leader link')
 def send_leader_link():
     if session['chatroom-key'] == get_room(session['chatroom']).key:
         if get_room(session['chatroom']).subinvites or session['userID'] == get_room(session['chatroom']).creator[
@@ -669,7 +681,7 @@ def send_leader_link():
             leader_link = f'{request.url_root[:-1] + leader_dir}?token={get_room(session["chatroom"]).token}&chatroom={session["chatroom"].lower()}'
             join_room(session['userID'])
             emit('leader link', {'data': {'link': leader_link}}, room=session['userID'])
-            leave_room(session['userID'])
+            leave_room(session['userID'])'''
 
 
 @socketio.on('admin connect')
