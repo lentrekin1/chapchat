@@ -7,7 +7,7 @@ runtime_config:
 manual_scaling:
   instances: 1
 
-entrypoint: gunicorn -k eventlet main:app
+entrypoint: gunicorn -b :$PORT -k eventlet main:app
 
 handlers:
   - url: /static

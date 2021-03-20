@@ -188,6 +188,7 @@
           if ($('#messageText').val() !== '' && $.trim($('#messageText').val()) !== '') {
               var message = $("#messageText").val();
               document.getElementById('sendMessage').innerHTML = 'Sending image...';
+              socket.emit('typing status', {data: {status: false}});
               socket.emit('message', { data: { message: message} });
               $("#messageText").val("");
           }
@@ -197,6 +198,7 @@
               var msg = evt.target.result;
               isImg = true;
               document.getElementById('sendMessage').innerHTML = 'Sending image...';
+              socket.emit('typing status', {data: {status: false}});
               socket.emit('photo', { data: { photo: msg} });
           };
           reader.readAsDataURL(photo);
