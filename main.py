@@ -15,14 +15,17 @@ from flask import Flask, render_template, session, request, redirect, flash
 from flask_login import current_user, login_user, LoginManager, UserMixin, logout_user
 from flask_mail import Mail, Message
 from flask_socketio import SocketIO, emit, join_room, leave_room
-
+from flask_talisman import Talisman
 from flask_session import Session
+
 #emojis etc - not working on my phone
 #fix ssl warning
 #typing notifications
 #use deadspace in ui (mainly on pc) - background?
 #todo leader collapse has no background - bad?
 #leader status didnt save on jays phone
+
+#todo cant see send msg area on iphone 8
 
 if not os.path.isdir('logs'):
     os.mkdir('logs')
@@ -42,6 +45,7 @@ logger.setLevel(logging.DEBUG)
 app = Flask(__name__)
 app.debug = True
 app.config['SECRET_KEY'] = 'tqwefsdd3.,edmk;vkflqjdmsndakd'
+talisman = Talisman(app, content_security_policy=None)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'admin'
@@ -116,6 +120,7 @@ class room():
         self.photos_enabled = photos
         self.other_leaders = leaders
         self.subinvites = subinvites
+        self.typing = []
         self.creator = {'userID': creator_id} if creator_id else None
         self.leaders = []
         self.pending_leaders = []
@@ -127,6 +132,15 @@ class room():
         self.token = make_token()
         if refresh_time:
             self.token_time = time.time()
+
+    def get_typing(self, all=False):
+        if len(self.typing) <= 3 or all == True:
+            if len(self.typing) >= 1:
+                return ', '.join(self.typing) + ' are typing...' if len(self.typing) > 1 else self.typing[0] + ' is typing...'
+            else:
+                return ''
+        else:
+            return 'Several people are typing...'
 
     def add_msg(self, msg):
         if len(self.messages) >= self.max_len:
@@ -185,7 +199,7 @@ class room():
                 check = check.lower()
             if check == nick if nick else userID:
                 del self.people[i]
-                break
+                return True
 
     def get_leader(self, nick=None, userID=None):
         if nick:
@@ -331,7 +345,7 @@ def get_hash(pw):
 
 
 def timestamp():
-    return str(datetime.utcnow()) + 'Z'
+    return str(datetime.utcnow()).replace(' ', 'T') + 'Z'
 
 
 def setup_pass_change():
@@ -351,18 +365,8 @@ def make_session_permanent():
         session['userID'] = ''.join(random.choices(string.ascii_letters, k=30))
     session.permanent = True
 
-
 @app.route('/')
 def chat():
-    '''if 'realtime-chat-nickname' in request.cookies and val_nick(request.cookies['realtime-chat-nickname']):
-      if "oldroom" in request.cookies and request.cookies["oldroom"]:
-        if request.cookies['oldroom'] in rooms:
-          return redirect('/' + request.cookies["oldroom"])
-        else:
-          return
-      else:
-        return redirect('/mainchat')
-    else:'''
     return redirect('/login')
 
 
@@ -429,23 +433,24 @@ def admin():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        result = val_nick(request.form.get('nickname'))
-        if not request.form.get('nickname') or not result == True:
+        nick = request.form.get('nickname').replace(' ', '_')
+        result = val_nick(nick)
+        if not nick or not result == True:
             flash(result)
         elif 'main' in request.form.keys():
-            if request.form.get('nickname').lower() in get_room('mainchat').get_names(low=True):
+            if nick.lower() in get_room('mainchat').get_names(low=True):
                 flash('This name is taken for this room')
             else:
-                session['userName'] = request.form.get('nickname')
+                session['userName'] = nick
                 session['chatroom'] = 'mainchat'
                 return redirect(rooms_dir + 'mainchat')
         elif 'specific' in request.form.keys():
             if request.form.get('room'):
                 if get_room(request.form.get('room')):
-                    if request.form.get('nickname').lower() in get_room(request.form.get('room')).get_names(low=True):
+                    if nick.lower() in get_room(request.form.get('room')).get_names(low=True):
                         flash('This name is taken for this room')
                     else:
-                        session['userName'] = request.form.get('nickname')
+                        session['userName'] = nick
                         session['chatroom'] = request.form.get('room')
                         return redirect(rooms_dir + request.form.get('room'))
                 else:
@@ -453,7 +458,7 @@ def login():
             else:
                 flash('Please enter a room key')
         elif 'newroom' in request.form.keys():
-            session['userName'] = request.form.get('nickname')
+            session['userName'] = nick
             return redirect('/newroom')
     return render_template('login.html')
 
@@ -489,12 +494,13 @@ def priv_room(name):
 def enter_room(name):
     if get_room(name) and get_room(name).invites_enabled:
         if request.method == 'POST':
-            result = val_nick(request.form.get('nickname'))
+            nick = request.form.get('nickname').replace(' ', '_')
+            result = val_nick(nick)
             if result == True:
-                if request.form.get('nickname') in get_room(name).get_names(low=True):
+                if nick in get_room(name).get_names(low=True):
                     flash('This name is taken for this room')
                 else:
-                    session['userName'] = request.form.get('nickname')
+                    session['userName'] = nick
                     session['chatroom'] = name
                     return redirect(rooms_dir + name)
             flash(result)
@@ -549,6 +555,15 @@ def add_leader():
                 return 'This leader invite token has expired, please get a new one'
     return redirect('/login')'''
 
+@socketio.on('typing status')
+def typing(data):
+    if data['data']['status'] == True and session['userName'] not in get_room(session['chatroom']).typing:
+        get_room(session['chatroom']).typing.append(session['userName'])
+    else:
+        if data['data']['status'] == False and session['userName'] in get_room(session['chatroom']).typing:
+            get_room(session['chatroom']).typing.remove(session['userName'])
+    #todo emitting msg here prob bad - only happens if someone typing
+    emit('typing update', {'data': {'info': get_room(session["chatroom"]).get_typing()}}, room=session['chatroom'])
 
 @socketio.on('message')
 def chat_message(data):
@@ -559,6 +574,9 @@ def chat_message(data):
             data['data']['user'] = session['userName']
             # get_room(data['data']['room']).add_msg(data)
             get_room(session['chatroom']).add_msg(data)
+            join_room(room=session['userID'])
+            emit('recv', room=session['userID'])
+            leave_room(room=session['userID'])
             emit('message', data, room=session['chatroom'].lower())
 
 
@@ -571,7 +589,7 @@ def photo(data):
             data['data']['user'] = session['userName']
             get_room(session['chatroom']).add_msg(data)
             join_room(room=session['userID'])
-            emit('recv')
+            emit('recv', room=session['userID'])
             leave_room(room=session['userID'])
             emit('message', {'data': data['data']}, room=session['chatroom'].lower())
 
@@ -680,18 +698,6 @@ def add_leader(data):
             leave_room(get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'], sid=get_room(session['chatroom']).get_user(data['data']['user'])['sid'])
             #get_room(session['chatroom']).add_leader({'userID': session['userID']})
             #session['chatroom-key'] = get_room(chatroom).key
-
-'''@socketio.on('get leader link')
-def send_leader_link():
-    if session['chatroom-key'] == get_room(session['chatroom']).key:
-        if get_room(session['chatroom']).subinvites or session['userID'] == get_room(session['chatroom']).creator[
-            'userID']:
-            if time.time() - get_room(session['chatroom']).token_time > leader_link_timeout * 60 * 60:
-                get_room(session["chatroom"]).set_token()
-            leader_link = f'{request.url_root[:-1] + leader_dir}?token={get_room(session["chatroom"]).token}&chatroom={session["chatroom"].lower()}'
-            join_room(session['userID'])
-            emit('leader link', {'data': {'link': leader_link}}, room=session['userID'])
-            leave_room(session['userID'])'''
 
 
 @socketio.on('admin connect')

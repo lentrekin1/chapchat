@@ -24,12 +24,3 @@
   width: 100%;
   background-color: #f1f1f1;
 }
-
-.fixed-panel {
-  min-height: 300px;
-  max-height: 300px;
-}
-
-.media-list {
-    overflow: auto;
-}
