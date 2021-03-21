@@ -597,7 +597,7 @@ def photo(data):
 @socketio.on('connect')
 def test_connect():
     # if session['userID'] not in get_room(session['chatroom']).banned:
-    emit('my response', {'data': 'Connected', 'count': 0})
+    emit('confirm connect', {'data': {'username': session['userName']}})
 
 
 @socketio.on('leave')

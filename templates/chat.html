@@ -45,7 +45,11 @@
     }
 
     socket.on('connect', function () {
-      socket.emit('set connection', { data: {message: 'I\'m connected!'} });
+        socket.emit('set connection');
+    });
+
+    socket.on('confirm connect', function (message) {
+        document.getElementById('userName').innerHTML = message.data.username
     });
 
     socket.on('disconnect', function(){
@@ -157,10 +161,6 @@
     }
 
     $(function () {
-
-      /*if (typeof $.cookie("realtime-chat-nickname") === 'undefined') {
-        window.location = "/login"
-      } else {*/
         $("#sendMessage").on("click", function () {
           sendMessage()
         });
@@ -177,7 +177,6 @@
             }
           }
         });
-      //}
 
       function sendMessage() {
         $container = $('.media-list');
@@ -305,6 +304,7 @@
             <div class="panel panel-info">
                 <div class="panel-heading">
                     <strong id="room">{{ roomName }}</strong>
+                    <strong id="userName" class="pull-right"></strong>
                     <span style="display:inline-block; width: 5px;"></span>
                     <div>
                         <button class="btn btn-primary btn-sm" id="share" onclick="shareLink()"
