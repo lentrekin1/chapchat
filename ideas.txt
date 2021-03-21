@@ -5,4 +5,6 @@
 
 -on jays phone: when user leave and rejoin, cant use old username - need to del probably
 -autoscrool doesnt appear to work for imgs
+'
+-todo change "Main_Chat" to something better
 

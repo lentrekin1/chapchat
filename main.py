@@ -235,7 +235,7 @@ def load_rooms():
     if not os.path.isfile('info/rooms.csv'):
         with open('info/rooms.csv', 'w', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow(['mainchat', 'True', 'False', 'False', 'False', 'None', 'None'])
+            writer.writerow(['Main_Chat', 'True', 'True', 'False', 'False', 'None', 'None'])
     with open('info/rooms.csv', 'r') as f:
         reader = csv.reader(f)
         for i in reader:
@@ -438,16 +438,16 @@ def login():
         if not nick or not result == True:
             flash(result)
         elif 'main' in request.form.keys():
-            if nick.lower() in get_room('mainchat').get_names(low=True):
+            if (get_room('Main_Chat').get_user(userID=session["userID"]) and session["userID"] != get_room('Main_Chat').get_user(userID=session["userID"])['userID']) and nick.lower() in get_room('Main_Chat').get_names(low=True):
                 flash('This name is taken for this room')
             else:
                 session['userName'] = nick
-                session['chatroom'] = 'mainchat'
-                return redirect(rooms_dir + 'mainchat')
+                session['chatroom'] = 'Main_Chat'
+                return redirect(rooms_dir + 'Main_Chat')
         elif 'specific' in request.form.keys():
             if request.form.get('room'):
                 if get_room(request.form.get('room')):
-                    if nick.lower() in get_room(request.form.get('room')).get_names(low=True):
+                    if session["userID"] != get_room(request.form.get('room')).get_user(userID=session["userID"])['userID'] and nick.lower() in get_room(request.form.get('room')).get_names(low=True):
                         flash('This name is taken for this room')
                     else:
                         session['userName'] = nick
