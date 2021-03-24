@@ -7,17 +7,6 @@
     <link href="{{ url_for('static',filename='styles/bootstrap.css') }}" rel="stylesheet" type="text/css">
     <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
     <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
-    <script>
-        var date = new Date()
-        date.setTime(date.getTime() + (24*60*60*1000));
-
-        function setAdmin() {
-            document.cookie = 'pass=' + document.getElementById('pass').value + ';expires=' + date.toUTCString() + '; path=/';
-        }
-
-
-
-    </script>
 </head>
 
 <body>
@@ -37,8 +26,8 @@
     {% block body %}{% endblock %}
 </div>
 
-<div class="container" >
-    <h1 class="text-center">ChapChat <img src="/static/logo.png" height="50" width="50" alt="logo"></h1>
+<div class="container">
+    <h1 class="text-center">ChapChat <img alt="logo" height="50" src="/static/logo.png" width="50"></h1>
     <div class="row">
         <div class="col-md-auto">
             <div class="login-panel panel panel-default">
@@ -52,7 +41,7 @@
                                 <input class="form-control" id="pass" name="pass" placeholder="Enter Password"
                                        type="password" value="">
                             </div>
-                            <button class="btn btn-lg btn-success" name="main" onclick="setAdmin()" type="submit">
+                            <button class="btn btn-lg btn-success" name="main" type="submit">
                                 Login
                             </button>
                         </fieldset>

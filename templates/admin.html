@@ -24,52 +24,126 @@
         }
     }
 
-    //var channel = window.location.href.split('/').slice(3).join('/');
-    var roomsDir = '/rooms/';
     var channel;
-    var socket = io.connect(window.location.protocol + '//' + document.domain + ':' + location.port);
-    //var receivedMsg;
+    var roomsDir = '/rooms/';
+    var inviteDir = '/invite/';
+    var socket = io.connect(window.location.protocol + '//' + document.domain);
 
-    socket.on('connect', function () {
-        //connect();
-        console.log('connected');
-    });
+    /*socket.on('connect', function () {
+        socket.emit('set connection');
+    });*/
+
 
     socket.on('disconnect', function(){
       console.log("chat disconnected");
     });
 
     socket.on("message", function (message) {
-      //receivedMsg = message;
+      socket.on("message", function (message) {
+        if ('update' in message.data) {
+        console.log(message)
+            if (message.data.update === 'addition') {
+                if (!('inpast' in message.data)) {
+                document.getElementById('numUsers').innerHTML = parseInt(document.getElementById('numUsers').innerHTML) + 1
+                }
+                if (message.data.name !== userName){
+                    $("#dropdownMain").append('<li><a class="dropdown-item" name="' + message.data.name + '" id="' + message.data.name + '" style="word-wrap: break-word;">' + message.data.name + '</a></li>');
+                    $("#dropdownMain li a").click(function(){
+                      //var length = document.getElementById('userDropdown').offsetWidth;
+                      document.getElementById('userDropdown').innerHTML = $(this).text();
+                      //document.getElementById('userDropdown').style.width = length + 'px';
+                    });
+                }
+            }
+            if (message.data.update === 'removal') {
+                if (!('inpast' in message.data)) {
+                    document.getElementById('numUsers').innerHTML = parseInt(document.getElementById('numUsers').innerHTML) - 1
+                }
+                if (document.getElementById('userDropdown').innerHTML.trim() === message.data.kick) {
+                    document.getElementById('userDropdown').innerHTML = 'Select a user'
+                }
+                if (document.getElementById(message.data.name)) {
+                    document.getElementById(message.data.name).parentNode.parentNode.removeChild(document.getElementById(message.data.name).parentNode)
+                }
+            }
+
+        }
       refreshMessages(message);
     });
+    });
+
+    socket.on('recv', function (message) {
+        document.getElementById('sendMessage').innerHTML = 'SEND'
+    });
+
+    socket.on('typing update', function (message) {
+        document.getElementById('typingUpdate').innerHTML = ' ' + message.data.info;
+    });
+
+    socket.on('room info', function (message) {
+        document.getElementById('room').innerHTML = message.data.roomName;
+        for (var i = 0; i < message.data.people.length; i++) {
+            $("#dropdownMain").append('<li><a class="dropdown-item" name="' + message.data.people[i] + '" id="' + message.data.people[i] + '" style="word-wrap: break-word;">' + message.data.people[i] + '</a></li>');
+        }
+        document.getElementById('share').style.display = message.data.invites;
+        document.getElementById('photowrap').style.display = message.data.photos;
+        document.getElementById('addLeader').style.display = message.data.inviteLeaders;
+    });
+
+    function addLeader() {
+        if (document.getElementById('userDropdown').innerHTML.trim() !== 'Select user') {
+            if (confirm('Are you sure you want to add ' + document.getElementById('userDropdown').innerHTML.trim() + ' as a leader for ' + document.getElementById('room').innerHTML.trim() + '?')) {
+                socket.emit('add leader', {data: {user: document.getElementById('userDropdown').innerHTML.trim()}});
+            }
+        }
+    }
 
     socket.on('pass change confirm', function (message) {
         document.getElementById('confirm email').innerHTML = 'Password reset link sent to ' + message.data.email + '. It is valid for ' + message.data.timeout + ' minutes.';
     });
 
-    function refreshMessages(message, type="message") {
+    function getTimestamp(ts) {
+          var date = new Date(ts);
+          var hours = date.getHours();
+          var minutes = date.getMinutes();
+          var ampm = hours >= 12 ? 'PM' : 'AM';
+          hours = hours % 12;
+          hours = hours ? hours : 12;
+          minutes = minutes < 10 ? '0'+minutes : minutes;
+          var strTime = hours + ':' + minutes + ' ' + ampm;
+          return strTime;
+    }
+
+    function refreshMessages(message) {
       var $panel = $('#scrollbox');
       var shouldScroll = $panel[0].scrollHeight - $panel.height() - 31 <= $panel.scrollTop();
 
       if (message.data.type == "message") {
-      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '&#60;' + message.data.author + '&#62;' + ': ' + message.data.message  + '<br/></div></div></div></li>');
-      $(".media-list").append('<small>' + message.data.timestamp + '</small>');
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '<strong>' + message.data.user + '</strong>' + '<small>' + '  ' + getTimestamp(message.data.timestamp) + '</small>' + '<br/>' + message.data.message + '</div></div></div></li>');
       }
 
       if (message.data.type == "announcement") {
-      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + '&#60;' + message.data.message + '&#62;' + '<br/></div></div></div></li>');
-      $(".media-list").append('<small style="color:red;">' + message.data.timestamp + '</small>');
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + message.data.message + '<br/></div></div></div></li>');
+      $(".media-list").append('<small style="color:red;">' + getTimestamp(message.data.timestamp) + '</small>');
       }
 
       if (message.data.type == "announcement photo") {
-      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + '&#60;' + '<img src="' + message.data.photo + '" width="300" height="300" onclick="showFull(this)"/>' + '&#62;' + '<br/></div></div></div></li>');
-      $(".media-list").append('<small style="color:red;">' + message.data.timestamp + '</small>');
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + '&#60;' + '<img src="' + message.data.photo + '" width="300" height="300"/>' + '&#62;' + '<br/></div></div></div></li>');
+      $(".media-list").append('<small style="color:red;">' + getTimestamp(message.data.timestamp) + '</small>');
       }
 
       if (message.data.type == "photo") {
-      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '&#60;' + message.data.author + '&#62;' + ': ' + '<img src="' + message.data.photo + '" width="300" height="300" onclick="showFull(this)"/>' + '<br/></div></div></div></li>');
-      $(".media-list").append('<small>' + message.data.timestamp + '</small>');
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">' + '<strong>' + message.data.user + '</strong>' + '<small>' + '  ' + getTimestamp(message.data.timestamp) + '</small>' + '<br/>' + '<img src="' + message.data.photo + '" style="max-width:400px;max-height:400px"/>' + '<br/></div></div></div></li>');
+      }
+// todo need to add/remove rooms using socketio
+      if (message.data.type == "caught up") {
+          document.getElementById('numUsers').innerHTML = message.data.numUsers
+          var leaderMsg = JSON.parse(localStorage.getItem("givenLeader"));
+          if (leaderMsg && leaderMsg.data.for == message.data.for) {
+            refreshMessages(leaderMsg);
+          }
+      } else {
+        $(".media-list").append('<hr style="margin-top:10px;margin-bottom:10px;"/>');
       }
 
       if (shouldScroll) {
@@ -88,43 +162,52 @@
             sendMessage();
           }
         });
-      })
+        });
 
     function sendMessage() {
-        if (typeof findRoom() !== "undefined") {
-            $container = $('.media-list');
-            $container[0].scrollTop = $container[0].scrollHeight;
-            var author = $.cookie("realtime-chat-nickname");
-            var photo = document.getElementById('photo').files[0];
-            if (typeof photo === "undefined") {
+        $container = $('.media-list');
+        $container[0].scrollTop = $container[0].scrollHeight;
+        var photo = document.getElementById('photo').files[0];
+        if (typeof photo === "undefined") {
+          if ($('#messageText').val() !== '' && $.trim($('#messageText').val()) !== '') {
               var message = $("#messageText").val();
-              socket.emit('admin announcement', { data: { message: message, room: channel, user: 'admin', pass: $.cookie("pass")} });
+              document.getElementById('sendMessage').innerHTML = 'Sending image...';
+              socket.emit('admin announcement', { data: { message: message} });
               $("#messageText").val("");
-            } else {
-              var reader = new FileReader();
-              reader.onload = function(evt){
-                  var msg = evt.target.result;
-                  socket.emit('admin photo', { data: { photo: msg, room: channel, user: 'admin', pass: $.cookie("pass")} });
-              };
-              reader.readAsDataURL(photo);
-              previewImg();
-            }
-            $('#scrollbox').stop().animate({scrollTop: $('#scrollbox').get(0).scrollHeight}, "fast");
+          }
         } else {
-            $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body">Enter a room to send messages<br/></div></div></div></li>');
+          var reader = new FileReader();
+          reader.onload = function(evt){
+              var msg = evt.target.result;
+              isImg = true;
+              document.getElementById('sendMessage').innerHTML = 'Sending image...';
+              socket.emit('admin photo', { data: { photo: msg} });
+          };
+          reader.readAsDataURL(photo);
+          previewImg();
         }
+        $('#scrollbox').stop().animate({scrollTop: $('#scrollbox').get(0).scrollHeight}, "fast");
+      }
+
+    function leaveRoom() {
+      if (confirm('Are you sure you want to leave?')) {
+        location.href = '/login'
+      }
     }
 
     function previewImg() {
-      if (document.getElementById('remimg').style.display === 'none') {
-        document.getElementById('remimg').style.display = '';
-        document.getElementById('preview').style.display = '';
-        document.getElementById('preview').src = window.URL.createObjectURL(document.getElementById('photo').files[0])
+      if (document.getElementById('photowrap').innerHTML.trim() === 'Upload an image') {
+        if (document.getElementById("photo").value !== '') {
+            document.getElementById('photowrap').innerHTML = 'Remove image'
+            document.getElementById('preview').style.display = '';
+            document.getElementById('preview').src = window.URL.createObjectURL(document.getElementById('photo').files[0])
+        }
       } else {
-        document.getElementById('remimg').style.display = 'none';
+        document.getElementById('photowrap').innerHTML = 'Upload an image'
         document.getElementById('preview').style.display = 'none';
         document.getElementById('preview').src = '#'
         document.getElementById("photo").value = "";
+        return false;
       }
     }
 
@@ -144,28 +227,57 @@
         }
     }
 
+    function shareLink() {
+      try{
+        navigator.share({
+          title: 'Share a link to this chatroom',
+          text: 'Join this chatroom now!',
+          url: window.location.protocol + '//' + document.domain + inviteDir + channel
+        })
+      } catch(err) {
+        var tmp = document.createElement('input');
+        document.body.appendChild(tmp);
+        tmp.value = window.location.protocol + '//' + document.domain + inviteDir + channel
+        tmp.select();
+        document.execCommand("copy", false);
+        tmp.remove();
+        document.getElementById('share').innerHTML = '✓ Invite Link Copied';
+        setTimeout(function(){
+            document.getElementById('share').innerHTML = 'Share Invite Link';
+        }, 3000);
+      }
+    }
+
+    function kickUser() {
+        if (document.getElementById('userDropdown').innerHTML.trim() !== 'Select user') {
+            if (confirm('Are you sure you want to kick ' + document.getElementById('userDropdown').innerHTML.trim() + '?')) {
+            socket.emit('kick user', {data: {kick: document.getElementById('userDropdown').innerHTML}});
+            }
+            document.getElementById('userDropdown').innerHTML = 'Select user'
+        }
+     }
+
     function connect() {
         if (typeof findRoom() !== "undefined" && typeof findRoom() !== channel) {
             $(".media-list").empty();
             channel = findRoom();
             document.getElementById('room').innerHTML = channel;
-            socket.emit('admin connect', { data: {message: 'admin connected!', room: channel, user: 'admin', pass: $.cookie("pass")} });
+            socket.emit('admin connect', { data: {room: channel}});
         } else {
             $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">Please select a (new) room to join<br/></div></div></div></li>');
         }
     }
 
     function dc() {
-        socket.emit('admin disconnect', {data: {room: channel, user: 'admin', pass: $.cookie("pass")}});
+        socket.emit('admin disconnect');
         window.location.reload()
     }
 
     window.onbeforeunload = function () {
         dc();
-        //document.cookie = 'pass=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     }
 
-    function showFull(e) {
+    /*function showFull(e) {
       if (e.height === 300 && e.width === 300) {
         e.height = 500;
         e.width = 500;
@@ -173,43 +285,91 @@
         e.height = 300;
         e.width = 300;
       }
-    }
+    }*/
 
     function changePass() {
-        socket.emit('change admin pass', {data: {pass: $.cookie("pass")}});
+        socket.emit('change admin pass');
     }
 
     function logOut() {
         window.location.href = '/logout';
     }
 
-
-
     </script>
     <style type="text/css">
-        input[type="file"] {
-           display: none;
+        @media (max-height: 700px) {
+            .fixed-panel {
+              min-height: 50vh;
+              max-height: 50vh;
+            }
         }
 
+        @media (min-height: 701px) {
+            .fixed-panel {
+              min-height: 60vh;
+              max-height: 60vh;
+            }
+        }
 
+        .media-list {
+          overflow: auto;
+        }
 
+        input[type="file"] {
+          display: none;
+        }
     </style>
     <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
 </head>
 
-<body>
-<h1 class="text-center">ChapChat <img src="/static/logo.png" height="50" width="50" alt="logo"></h1>
-<br>
-<div class="panel panel-primary col-md-11">
-    <div class="panel-body">There are {{ totalnum }} people in {{ rooms|length }} rooms</div>
+<!-- overflow:hidden; -->
+<body style="">
+<h3 class="text-center">ChapChat <img alt="logo" height="50" src="/static/logo.png" width="50"></h3>
+<div class="panel panel-primary col-lg">
+    <!-- todo get this to update at load and w/ update socket events -->
+    <div class="panel-body">There are <strong id="numPeople">{{ totalnum }}</strong> people in <strong id="numRooms">{{ rooms|length }}</strong> rooms</div>
 </div>
 <div class="row">
-    <div id="chatbox">
-        <div class="panel panel-info col-md-11">
+    <div class="col-lg" id="chatbox">
+        <div class="panel panel-info">
             <div class="panel-heading">
                 <strong id="room">Not connected to a room</strong>
+                <span style="display:inline-block; width: 5px;"></span>
+                    <strong id="numUsers">0</strong><strong> users connected</strong>
+                    <strong class="pull-right" id="userName">Admin</strong>
+                    <span style="display:inline-block; width: 5px;"></span>
+                    <div>
+                        <button class="btn btn-primary btn-sm" id="share" onclick="shareLink()"
+                                style="">Share Invite
+                        </button>
+                        <button class="btn btn-sm btn-danger" id="leave" name="leave" onclick="leaveRoom()">Leave
+                        </button>
+
+                        <button aria-controls="leaderTools" aria-expanded="false" class="btn btn-primary btn-sm"
+                                data-target="#leaderTools" data-toggle="collapse"
+                                type="button">
+                            Leader Tools
+                        </button>
+                        <div class="collapse" id="leaderTools">
+                            <br>
+                            <div class="dropdown form-row justify-content-center"
+                                 id="kick screen">
+                                <button aria-expanded="false" aria-haspopup="true"
+                                        class="btn btn-primary btn-sm dropdown-toggle"
+                                        data-toggle="dropdown" id="userDropdown" type="button">Select user
+                                </button>
+                                <ul class="dropdown-menu dropdown-primary" id="dropdownMain"
+                                    style="height:200px;overflow-y:auto;">
+                                </ul>
+                                <button class="btn btn-warning btn-sm" id="kickUser" onclick="kickUser()">Kick</button>
+                                <button class="btn btn-primary btn-sm" id="addLeader" onclick="addLeader()"
+                                        style="">Add Leader
+                                </button>
+                            </div>
+                        </div>
+                    </div>
             </div>
-            <div class="panel-body fixed-panel" id="scrollbox" style="max-height: 10;overflow-y: scroll;">
+            <div class="panel-body fixed-panel" id="scrollbox" style="max-height: 1;overflow-y: scroll;position: relative;">
                 <ul class="media-list">
                     <li class="media">
                         <div class="media-body">
@@ -220,18 +380,18 @@
                     </li>
                 </ul>
             </div>
-            <div class="panel-footer">
+            <small id="typingUpdate" style="margin-left: 15px;"></small>
+            <div class="panel-footer clearfix">
                 <input autofocus class="form-control" id="messageText" placeholder="Enter Message" type="text"/>
-                <label class="btn btn-info" for="photo" id="photowrap">
-                    <input accept=".jpg, .jpeg, .png" id="photo" onchange="previewImg(this)" type="file">
-                    Upload an image
-                </label>
-                <button class="btn btn-info" id="sendMessage" type="button">SEND <span
-                        class="glyphicon glyphicon-send"></span></button>
-                <img height="100" id="preview" src="#" style="display: none;" width="100">
-                <button class="btn btn-info" id="remimg" onclick="previewImg(this)" style="display: none;">Remove
-                    Image
-                </button>
+                <label class="btn btn-info" for="photo" id="photowrap"
+                           style="vertical-align:top;margin:5px;">
+                        Upload an image
+                    </label>
+                    <img height="40" id="preview" src="#" style="display: none;margin:5px;" width="40">
+                    <input accept=".jpg, .jpeg, .png" id="photo" onchange="previewImg()" onclick="return previewImg();"
+                           type="file">
+                    <button class="btn btn-info" id="sendMessage" style="margin:5px;float:right;" type="button">SEND
+                    </button>
             </div>
         </div>
     </div>
@@ -247,7 +407,7 @@
 </button>
 <div class="content">
     {% for person in room.people %}
-    <p>{{ person }}</p>
+    <p style="color:black;">{{ person.nickname }}</p>
     {% endfor %}
 </div>
 {% endfor %}

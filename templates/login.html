@@ -33,16 +33,16 @@
 </div>
 
 <div class="container">
-      <h1 class="text-center">ChapChat <img src="/static/logo.png" height="50" width="50" alt="logo"></h1>
+    <h1 class="text-center">ChapChat <img alt="logo" height="50" src="/static/logo.png" width="50"></h1>
     <br>
     <div class="row">
         <div class="col-md-auto">
             <div class="login-panel panel panel-default">
                 <div class="panel-heading">
-                    <h3 class="panel-title">Choose a nickname to enter chat</h3>
+                    <h3 class="panel-title">Choose a nickname to enter a chat</h3>
                 </div>
                 <div class="panel-body">
-                    <form method="post" name="frm-login" role="form" onkeydown="return event.key != 'Enter';">
+                    <form method="post" name="frm-login" onkeydown="return event.key != 'Enter';" role="form">
                         <fieldset>
                             <div class="form-group">
                                 <input class="form-control" id="nickname" name="nickname" placeholder="Enter Nickname"

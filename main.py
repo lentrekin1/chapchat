@@ -2,13 +2,13 @@ import base64
 import csv
 import hashlib
 import hmac
+import logging
 import os
 import pickle
 import random
+import re
 import string
 import time
-import re
-import logging
 from datetime import datetime
 
 from flask import Flask, render_template, session, request, redirect, flash
@@ -18,27 +18,21 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_talisman import Talisman
 from flask_session import Session
 
-#emojis etc - not working on my phone
-#fix ssl warning
-#typing notifications
-#use deadspace in ui (mainly on pc) - background?
-#todo leader collapse has no background - bad?
-#leader status didnt save on jays phone
-
-#todo cant see send msg area on iphone 8
 
 if not os.path.isdir('logs'):
     os.mkdir('logs')
 
 token_size = 50
 
+
 def make_token(size=token_size):
     return ''.join(random.choices(string.ascii_letters, k=size))
+
 
 log_token = make_token(size=7)
 filename = 'logs\{:%Y_%m_%d_%H}-' + log_token + '.log'
 logging.basicConfig(filename=filename.format(datetime.now()),
-                            format='%(asctime)s | %(levelname)-8s | %(message)s', filemode='w')
+                    format='%(asctime)s | %(levelname)-8s | %(message)s', filemode='w')
 logger = logging.getLogger("ChapChat")
 logger.setLevel(logging.DEBUG)
 
@@ -98,6 +92,7 @@ def save_creds(h, s, r):
         pickle.dump({'phash': h, 'psalt': s, 'prequested': r}, f)
     get_creds()
 
+
 def exists(data, check):
     try:
         if data[check] or data['data'][check]:
@@ -136,7 +131,8 @@ class room():
     def get_typing(self, all=False):
         if len(self.typing) <= 3 or all == True:
             if len(self.typing) >= 1:
-                return ', '.join(self.typing) + ' are typing...' if len(self.typing) > 1 else self.typing[0] + ' is typing...'
+                return ', '.join(self.typing) + ' are typing...' if len(self.typing) > 1 else self.typing[
+                                                                                                  0] + ' is typing...'
             else:
                 return ''
         else:
@@ -217,10 +213,12 @@ class room():
         for i in range(len(self.people)):
             check = self.people[i]['nickname' if nick else 'userID']
             if nick:
-
                 check = check.lower()
             if check == nick if nick else userID:
                 return self.people[i]
+
+    def get_num_users(self):
+        return len(self.people)
 
     def is_banned(self, uid):
         if uid in [x['userID'] for x in self.banned]:
@@ -252,8 +250,6 @@ def save_room(r, save_key=True, save_creator=True):
              r.creator['userID'] if save_creator else 'None'])
 
 
-# todo add method from admin panel to delete/save rooms (save to csv file)
-# todo figure out why invalid ssl from GCP - https://stackoverflow.com/a/42255561 - helpful?
 rooms = load_rooms()
 
 
@@ -365,6 +361,7 @@ def make_session_permanent():
         session['userID'] = ''.join(random.choices(string.ascii_letters, k=30))
     session.permanent = True
 
+
 @app.route('/')
 def chat():
     return redirect('/login')
@@ -393,10 +390,6 @@ def newroom():
                 session['chatroom-key'] = get_room(name).key
                 get_room(name).add_leader({'nickname': session["userName"], 'userID': session['userID']}, creator=True)
                 get_room(name).add_user({'nickname': session["userName"], 'userID': session['userID']})
-                # resp = make_response(redirect(rooms_dir + str(name)))
-                # resp.set_cookie('room-key', get_room(name).key)
-                # return resp
-            # else:
             return redirect(rooms_dir + str(name))
         else:
             flash(result)
@@ -413,17 +406,18 @@ def logout():
 
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
-    if isinstance(val_pw(session['master-key']), str):
+    if exists(session, 'master-key') and isinstance(val_pw(session['master-key']), str):
         session.clear()
         logout_user()
     if current_user.is_authenticated:
         return render_template('admin.html', rooms=rooms, totalnum=get_total_users())
     if request.method == 'POST':
-        result = val_pw(request.form.get('master-key'))
+        result = val_pw(request.form.get('pass'))
         if result == True:
-            session['master-key'] = request.form.get('master-key')
+            session['master-key'] = request.form.get('pass')
             session['userName'] = 'admin'
-            login_user(User('admin'))
+            login_user(User())
+            #todo clicking leave room button in admin.html shoulnt reload page
             return render_template('admin.html', rooms=rooms, totalnum=get_total_users())
         else:
             flash(result)
@@ -438,7 +432,9 @@ def login():
         if not nick or not result == True:
             flash(result)
         elif 'main' in request.form.keys():
-            if (get_room('Main_Chat').get_user(userID=session["userID"]) and session["userID"] != get_room('Main_Chat').get_user(userID=session["userID"])['userID']) and nick.lower() in get_room('Main_Chat').get_names(low=True):
+            if (get_room('Main_Chat').get_user(userID=session["userID"]) and session["userID"] !=
+                get_room('Main_Chat').get_user(userID=session["userID"])['userID']) and nick.lower() in get_room(
+                    'Main_Chat').get_names(low=True):
                 flash('This name is taken for this room')
             else:
                 session['userName'] = nick
@@ -447,7 +443,7 @@ def login():
         elif 'specific' in request.form.keys():
             if request.form.get('room'):
                 if get_room(request.form.get('room')):
-                    if session["userID"] != get_room(request.form.get('room')).get_user(userID=session["userID"])['userID'] and nick.lower() in get_room(request.form.get('room')).get_names(low=True):
+                    if not get_room(request.form.get('room')).get_user(userID=session["userID"]) and nick.lower() in get_room(request.form.get('room')).get_names(low=True):
                         flash('This name is taken for this room')
                     else:
                         session['userName'] = nick
@@ -469,7 +465,8 @@ def priv_room(name):
         if 'userName' in session and not get_room(name).is_banned(session['userID']):
             if session['userID'] in get_room(session['chatroom']).pending_leaders:
                 session['chatroom-key'] = get_room(name).key
-                get_room(session['chatroom']).pending_leaders.remove(get_room(session['chatroom']).get_leader(nick=session['userName'])['userID'])
+                get_room(session['chatroom']).pending_leaders.remove(
+                    get_room(session['chatroom']).get_leader(nick=session['userName'])['userID'])
             roomLeader = 'none'
             people = []
             inviteLeaders = 'none'
@@ -477,7 +474,8 @@ def priv_room(name):
                 get_room(session['chatroom']).add_leader({'userID': session['userID'], 'nickname': session['userName']})
                 people = get_room(name).get_names()
                 roomLeader = ''
-                if get_room(name).other_leaders == get_room(name).subinvites == True or (get_room(name).other_leaders and session['userID'] == get_room(name).creator['userID']):
+                if get_room(name).other_leaders == get_room(name).subinvites == True or (
+                        get_room(name).other_leaders and session['userID'] == get_room(name).creator['userID']):
                     inviteLeaders = ''
             return render_template('chat.html', roomName=name, people=people, roomLeader=roomLeader,
                                    invites='' if get_room(name).invites_enabled else 'none',
@@ -487,8 +485,6 @@ def priv_room(name):
             return redirect('/login')
     return render_template('404.html'), 404
 
-
-# todo make sure all options choosen by room creator shown on admin view
 
 @app.route(invite_dir + '<name>', methods=['GET', 'POST'])
 def enter_room(name):
@@ -555,6 +551,7 @@ def add_leader():
                 return 'This leader invite token has expired, please get a new one'
     return redirect('/login')'''
 
+
 @socketio.on('typing status')
 def typing(data):
     if data['data']['status'] == True and session['userName'] not in get_room(session['chatroom']).typing:
@@ -562,8 +559,9 @@ def typing(data):
     else:
         if data['data']['status'] == False and session['userName'] in get_room(session['chatroom']).typing:
             get_room(session['chatroom']).typing.remove(session['userName'])
-    #todo emitting msg here prob bad - only happens if someone typing
+    # todo emitting msg here prob bad - only happens if someone typing
     emit('typing update', {'data': {'info': get_room(session["chatroom"]).get_typing()}}, room=session['chatroom'])
+
 
 @socketio.on('message')
 def chat_message(data):
@@ -583,7 +581,8 @@ def chat_message(data):
 @socketio.on('photo')
 def photo(data):
     if not get_room(session['chatroom']).is_banned(session['userID']):
-        if get_room(session['chatroom']).photos_enabled and data['data']['photo'] != '' and not data['data']['photo'].isspace():
+        if get_room(session['chatroom']).photos_enabled and data['data']['photo'] != '' and not data['data'][
+            'photo'].isspace():
             data['data']['timestamp'] = timestamp()
             data['data']['type'] = 'photo'
             data['data']['user'] = session['userName']
@@ -602,7 +601,8 @@ def test_connect():
 
 @socketio.on('leave')
 def leave(data, admin=False):
-    data['data']['timestamp'] = timestamp()
+    if not admin:
+        data['data']['timestamp'] = timestamp()
     leave_room(session['chatroom'].lower())
     if admin and exists(session, 'master-key') and val_pw(session['master-key']) == True:
         app.logger.info(f'Admin (userID={session["userID"]}) disconnected from room {session["chatroom"]}')
@@ -619,23 +619,33 @@ def leave(data, admin=False):
 @socketio.on('set connection')
 def set_connect(data=None, sess=session, admin=False):
     if not get_room(session['chatroom']).is_banned(session['userID']):
-        join_room(sess['userName'])
+        #todo prob security vuln here w/ using userName bc could be same username in diff chat rooms
+        #todo user count doesnt work with 3+ users - user3 sees 2 when 3, user4 sees 2 when 4
+        join_room(sess['userID'])
         for m in get_room(sess['chatroom']).messages:
-            emit('message', m, room=sess['userName'])
-        emit('message', {'data': {'type': 'caught up', 'for': sess['userID'], 'timestamp': timestamp()}}, room=sess['userName'])
-        leave_room(sess['userName'])
+            m['data']['inpast'] = True
+            emit('message', m, room=sess['userID'])
+        emit('message', {'data': {'type': 'caught up', 'for': sess['userID'], 'numUsers': get_room(session['chatroom']).get_num_users(), 'timestamp': timestamp()}},
+             room=sess['userID'])
+        leave_room(sess['userID'])
 
         join_room(sess['chatroom'].lower())
         if admin and exists(sess, 'master-key') and val_pw(sess['master-key']) == True:
-            #emit('user list',
+            # emit('user list',
             #     {'data': {'users': ','.join([x['nickname'] for x in get_room(session['chatroom']).people])}}, room=sess['chatroom'])
+            if get_room(sess['chatroom']).other_leaders == True:
+                iL = ''
+            else:
+                iL = 'none'
+            emit('room info', {'data': {'roomName': sess['chatroom'], 'people': get_room(sess['chatroom']).get_names(), 'invites': '' if get_room(sess['chatroom']).invites_enabled else 'none',
+                                        'photos': '' if get_room(sess["chatroom"]).photos_enabled else 'none', 'inviteLeaders': iL}})
             app.logger.info(f'Admin (userID={session["userID"]}) connected to room {session["chatroom"]}')
         else:
-            #if exists(sess, 'room-key') and sess['room-key'] == get_room(sess['chatroom']).key:
+            # if exists(sess, 'room-key') and sess['room-key'] == get_room(sess['chatroom']).key:
             #    emit('user list', {'data': {'users': ','.join([x['nickname'] for x in get_room(session['chatroom']).people])}})
 
-            get_room(session['chatroom']).add_leader(
-                {'userID': session['userID'], 'nickname': session['userName'], 'sid': request.sid})
+            #get_room(session['chatroom']).add_leader(
+            #    {'userID': session['userID'], 'nickname': session['userName'], 'sid': request.sid})
 
             get_room(sess['chatroom']).add_msg({'data': {'message': f'{sess["userName"]} has joined the server',
                                                          'timestamp': timestamp(), 'type': 'announcement'}})
@@ -692,12 +702,19 @@ def add_leader(data):
             get_room(session['chatroom']).add_leader(get_room(session['chatroom']).get_user(nick=data['data']['user']))
             app.logger.info(
                 f"User {data['data']['user']} (userID = {get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID']}) was made a leader of {session['chatroom']} by {session['userName']} (userID = {session['userID']})")
-            join_room(get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'], sid=get_room(session['chatroom']).get_user(nick=data['data']['user'])['sid'])
-            emit('given leader', {'data': {'message': f'You were made a leader of {session["chatroom"]} by {session["userName"]}', 'for': get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'], 'timestamp': timestamp(), 'type': 'announcement'}}, room=get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'])
-            get_room(session['chatroom']).pending_leaders.append(get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'])
-            leave_room(get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'], sid=get_room(session['chatroom']).get_user(data['data']['user'])['sid'])
-            #get_room(session['chatroom']).add_leader({'userID': session['userID']})
-            #session['chatroom-key'] = get_room(chatroom).key
+            join_room(get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'],
+                      sid=get_room(session['chatroom']).get_user(nick=data['data']['user'])['sid'])
+            emit('given leader', {
+                'data': {'message': f'You were made a leader of {session["chatroom"]} by {session["userName"]}',
+                         'for': get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'],
+                         'timestamp': timestamp(), 'type': 'announcement'}},
+                 room=get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'])
+            get_room(session['chatroom']).pending_leaders.append(
+                get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'])
+            leave_room(get_room(session['chatroom']).get_user(nick=data['data']['user'])['userID'],
+                       sid=get_room(session['chatroom']).get_user(data['data']['user'])['sid'])
+            # get_room(session['chatroom']).add_leader({'userID': session['userID']})
+            # session['chatroom-key'] = get_room(chatroom).key
 
 
 @socketio.on('admin connect')
@@ -706,16 +723,18 @@ def admin_conect(data):
     data['data']['timestamp'] = timestamp()
     if exists(session, 'master-key') and val_pw(session['master-key']) == True:
         admin_sids.append(request.sid)
-        session['chatroom-key'] = get_room(data['room']).key
-        set_connect(sess=session, admin=True)
+        session['chatroom-key'] = get_room(data['data']['room']).key
+        session['chatroom'] = data['data']['room']
+        set_connect(data=data, sess=session, admin=True)
 
 
 @socketio.on('admin disconnect')
-def admin_disconect(data):
-    data['data']['timestamp'] = timestamp()
+def admin_disconect():
     if exists(session, 'master-key') and val_pw(session['master-key']) == True:
-        admin_sids.remove(request.sid)
-        leave(sess=session, admin=True)
+        if request.sid in admin_sids:
+            admin_sids.remove(request.sid)
+        if 'chatroom' in session:
+            leave(None, admin=True)
 
 
 @socketio.on('admin announcement')
@@ -759,15 +778,3 @@ def change_pass(data):
 
 if __name__ == '__main__':
     socketio.run(app, port=80)
-
-##############
-# sooooooo it appears to work but u have to connect w/ vpn (https://chap-chat-test-305403.wm.r.appspot.com)
-# prob start actually making this good
-##############
-
-
-######### old ############
-# stil getting error 400 from socketio but only on gcp not local
-# seems to get better after a few min
-# see https://stackoverflow.com/questions/65144726/app-engine-flask-socketio-server-cors-allowed-origins-header-is-missing
-# and https://stackoverflow.com/questions/65189422/flask-docker-container-socketio-issues

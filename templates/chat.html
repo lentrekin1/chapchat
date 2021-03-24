@@ -20,6 +20,7 @@
     var normalMaxHeight = 300;
     var enlargedMaxWidth = 500
     var enlargedMaxHeight = 500;
+    var userName;
 
     window.onbeforeunload = function () {
       socket.emit('leave', {data: {room: channel}})
@@ -49,7 +50,8 @@
     });
 
     socket.on('confirm connect', function (message) {
-        document.getElementById('userName').innerHTML = message.data.username
+        document.getElementById('userName').innerHTML = message.data.username;
+        userName = message.data.username;
     });
 
     socket.on('disconnect', function(){
@@ -58,15 +60,24 @@
 
     socket.on("message", function (message) {
         if ('update' in message.data) {
+        console.log(message)
             if (message.data.update === 'addition') {
-                $("#dropdownMain").append('<li><a class="dropdown-item" name="' + message.data.name + '" id="' + message.data.name + '" style="word-wrap: break-word;">' + message.data.name + '</a></li>');
-                $("#dropdownMain li a").click(function(){
-                  //var length = document.getElementById('userDropdown').offsetWidth;
-                  document.getElementById('userDropdown').innerHTML = $(this).text();
-                  //document.getElementById('userDropdown').style.width = length + 'px';
-                });
+                if (!('inpast' in message.data)) {
+                document.getElementById('numUsers').innerHTML = parseInt(document.getElementById('numUsers').innerHTML) + 1
+                }
+                if (message.data.name !== userName){
+                    $("#dropdownMain").append('<li><a class="dropdown-item" name="' + message.data.name + '" id="' + message.data.name + '" style="word-wrap: break-word;">' + message.data.name + '</a></li>');
+                    $("#dropdownMain li a").click(function(){
+                      //var length = document.getElementById('userDropdown').offsetWidth;
+                      document.getElementById('userDropdown').innerHTML = $(this).text();
+                      //document.getElementById('userDropdown').style.width = length + 'px';
+                    });
+                }
             }
             if (message.data.update === 'removal') {
+                if (!('inpast' in message.data)) {
+                    document.getElementById('numUsers').innerHTML = parseInt(document.getElementById('numUsers').innerHTML) - 1
+                }
                 if (document.getElementById('userDropdown').innerHTML.trim() === message.data.kick) {
                     document.getElementById('userDropdown').innerHTML = 'Select a user'
                 }
@@ -136,7 +147,7 @@
       }
 
       if (message.data.type == "announcement photo") {
-      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + '&#60;' + '<img src="' + message.data.photo + '" width="300" height="300" onclick="showFull(this)"/>' + '&#62;' + '<br/></div></div></div></li>');
+      $(".media-list").append('<li class="media"><div class="media-body"><div class="media"><div class="media-body" style="color:red;">' + '&#60;' + '<img src="' + message.data.photo + '" width="300" height="300"/>' + '&#62;' + '<br/></div></div></div></li>');
       $(".media-list").append('<small style="color:red;">' + getTimestamp(message.data.timestamp) + '</small>');
       }
 
@@ -145,10 +156,10 @@
       }
 
       if (message.data.type == "caught up") {
+          document.getElementById('numUsers').innerHTML = message.data.numUsers
           var leaderMsg = JSON.parse(localStorage.getItem("givenLeader"));
           if (leaderMsg && leaderMsg.data.for == message.data.for) {
             refreshMessages(leaderMsg);
-
           }
       } else {
         $(".media-list").append('<hr style="margin-top:10px;margin-bottom:10px;"/>');
@@ -177,11 +188,11 @@
             }
           }
         });
+    })
 
-      function sendMessage() {
+    function sendMessage() {
         $container = $('.media-list');
         $container[0].scrollTop = $container[0].scrollHeight;
-        //var user = $.cookie("realtime-chat-nickname");
         var photo = document.getElementById('photo').files[0];
         if (typeof photo === "undefined") {
           if ($('#messageText').val() !== '' && $.trim($('#messageText').val()) !== '') {
@@ -204,8 +215,7 @@
           previewImg();
         }
         $('#scrollbox').stop().animate({scrollTop: $('#scrollbox').get(0).scrollHeight}, "fast");
-      }
-    })
+    }
 
     function leaveRoom() {
       if (confirm('Are you sure you want to leave?')) {
@@ -270,6 +280,7 @@
      }
 
 
+
     </script>
     <style type="text/css">
     @media (max-height: 700px) {
@@ -298,13 +309,15 @@
 
 <body style="overflow:hidden;">
 <div class="container">
-    <h3 class="text-center" style="line-height: 0.8em;" id="title">ChapChat <img src="/static/logo.png" height="30" width="30" alt="logo"></h3>
+    <h3 class="text-center" id="title" style="line-height: 0.8em;">ChapChat <img alt="logo" height="30" src="/static/logo.png" width="30"></h3>
     <div class="row">
-        <div id="chatbox" class="col-lg">
+        <div class="col-lg" id="chatbox">
             <div class="panel panel-info">
                 <div class="panel-heading">
                     <strong id="room">{{ roomName }}</strong>
-                    <strong id="userName" class="pull-right"></strong>
+                    <span style="display:inline-block; width: 5px;"></span>
+                    <strong id="numUsers">0</strong><strong> users connected</strong>
+                    <strong class="pull-right" id="userName"></strong>
                     <span style="display:inline-block; width: 5px;"></span>
                     <div>
                         <button class="btn btn-primary btn-sm" id="share" onclick="shareLink()"
@@ -313,7 +326,9 @@
                         <button class="btn btn-sm btn-danger" id="leave" name="leave" onclick="leaveRoom()">Leave
                         </button>
 
-                        <button class="btn btn-primary btn-sm" style="display:{{ roomLeader }};" type="button" data-toggle="collapse" data-target="#leaderTools" aria-expanded="false" aria-controls="leaderTools">
+                        <button aria-controls="leaderTools" aria-expanded="false" class="btn btn-primary btn-sm"
+                                data-target="#leaderTools" data-toggle="collapse" style="display:{{ roomLeader }};"
+                                type="button">
                             Leader Tools
                         </button>
                         <div class="collapse" id="leaderTools" style="">
@@ -333,24 +348,30 @@
                                     {% endfor %}
                                 </ul>
                                 <button class="btn btn-warning btn-sm" id="kickUser" onclick="kickUser()">Kick</button>
-                                <button class="btn btn-primary btn-sm" id="addLeader" onclick="addLeader()" style="display:{{ inviteLeaders }}">Add Leader</button>
+                                <button class="btn btn-primary btn-sm" id="addLeader" onclick="addLeader()"
+                                        style="display:{{ inviteLeaders }}">Add Leader
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="panel-body fixed-panel" id="scrollbox" style="max-height: 1;overflow-y: scroll;position: relative;">
+                <div class="panel-body fixed-panel" id="scrollbox"
+                     style="max-height: 1;overflow-y: scroll;position: relative;">
                     <ul class="media-list" id="chatList">
                     </ul>
                 </div>
                 <small id="typingUpdate" style="margin-left: 15px;"></small>
                 <div class="panel-footer clearfix">
                     <input autofocus class="form-control" id="messageText" placeholder="Enter Message" type="text"/>
-                    <label class="btn btn-info" for="photo" id="photowrap" style="vertical-align:top;margin:5px;display: {{ photos }}">
+                    <label class="btn btn-info" for="photo" id="photowrap"
+                           style="vertical-align:top;margin:5px;display: {{ photos }}">
                         Upload an image
                     </label>
                     <img height="40" id="preview" src="#" style="display: none;margin:5px;" width="40">
-                    <input accept=".jpg, .jpeg, .png" id="photo" onclick="return previewImg();" onchange="previewImg()" type="file">
-                    <button class="btn btn-info" id="sendMessage" style="margin:5px;float:right;" type="button">SEND</button>
+                    <input accept=".jpg, .jpeg, .png" id="photo" onchange="previewImg()" onclick="return previewImg();"
+                           type="file">
+                    <button class="btn btn-info" id="sendMessage" style="margin:5px;float:right;" type="button">SEND
+                    </button>
                 </div>
             </div>
         </div>
